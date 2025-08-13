@@ -19,6 +19,8 @@ type Orchestrator struct {
 	overseerAgent agent.CustomAgent
 }
 
+var store *session.Store
+
 func main() {
 	// Load global configuration
 	cfg := utils.NewConfigFromEnv(".env")
@@ -33,6 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize session store: %v", err)
 	}
+	store = sessionStore
 
 	// Initialize orchestrator
 	orchestrator := &Orchestrator{
@@ -52,7 +55,11 @@ func main() {
 
 func (o *Orchestrator) initializeOverseerAgent() {
 	// Create the overseer agent with all specialized agents as handoffs
-	o.overseerAgent = overseeragent.NewOverseerAgent(o.memoryStore, o.sessionStore)
+	var err error
+	o.overseerAgent, err = overseeragent.NewOverseerAgent(o.memoryStore, o.sessionStore)
+	if err != nil {
+		log.Fatalf("Failed to initialize overseer agent: %v", err)
+	}
 }
 
 func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
@@ -66,10 +73,12 @@ func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 
 	for {
 		fmt.Print("\n> ")
-		var input string
-		if _, err := fmt.Scanln(&input); err != nil {
-			continue
-		}
+		var input string = "Hello! How are you doing today?"
+		/*
+			if _, err := fmt.Scanln(&input); err != nil {
+				continue
+			}
+		*/
 
 		if input == "exit" {
 			break
@@ -89,18 +98,19 @@ func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 }
 
 func (o *Orchestrator) executeAgentCall(ctx context.Context, sess *session.Session, targetAgent agent.CustomAgent, input string) (string, error) {
-	// Save user message
-	userMsg := &session.Message{
-		SessionID: sess.ID,
-		Role:      "user",
-		Content:   input,
-	}
-	if err := o.sessionStore.SaveMessage(ctx, userMsg); err != nil {
-		return "", fmt.Errorf("failed to save user message: %w", err)
+	// Create a session instance for the agent runner
+	s := session.NewSession("default-user")
+	s.SetDB(store.GetDB()) // Inject the database connection
+
+	// Initialize OpenAI agents runner
+	runner := agents.Runner{
+		Config: agents.RunConfig{
+			Session: s,
+		},
 	}
 
 	// Execute agent call
-	response, err := agents.Run(ctx, targetAgent.Agent(), input)
+	response, err := runner.Run(ctx, targetAgent.Agent(), input)
 	if err != nil {
 		return "", fmt.Errorf("agent execution failed: %w", err)
 	}

@@ -41,6 +41,8 @@ github.com/nlpodyssey/openai-agents-go v0.0.0-20250805015602-3edb98324224 h1:pd8
 github.com/nlpodyssey/openai-agents-go v0.0.0-20250805015602-3edb98324224/go.mod h1:k73758/VsbbQi87GPitDWWGBZSHq++bkLw77K2Rdoyk=
 github.com/openai/openai-go v1.12.0 h1:NBQCnXzqOTv5wsgNC36PrFEiskGfO5wccfCWDo9S1U0=
 github.com/openai/openai-go v1.12.0/go.mod h1:g461MYGXEXBVdV5SaR/5tNzNbSfwTBBefwc+LlDCK0Y=
+github.com/openai/openai-go/v2 v2.0.2 h1:DlB9pnhhSRm2NuQNijB3j2U8fhDSk3sFX9ULK5hUs0o=
+github.com/openai/openai-go/v2 v2.0.2/go.mod h1:sIUkR+Cu/PMUVkSKhkk742PRURkQOCFhiwJ7eRSBqmk=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

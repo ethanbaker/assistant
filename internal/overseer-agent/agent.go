@@ -2,7 +2,6 @@ package overseeragent
 
 import (
 	"context"
-	"log"
 
 	memoryagent "github.com/ethanbaker/assistant/internal/memory-agent"
 	"github.com/ethanbaker/assistant/pkg/agent"
@@ -21,7 +20,7 @@ type OverseerAgent struct {
 }
 
 // NewOverseerAgent creates a new overseer agent with handoffs to all specialized agents
-func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) *OverseerAgent {
+func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) (*OverseerAgent, error) {
 	config := agent.LoadAgentConfig("overseer-agent")
 
 	// Create specialized agents for handoffs
@@ -35,9 +34,9 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) *O
 	})
 
 	// Load instructions from file with fallback to hardcoded version
-	instructions, err := utils.LoadPrompt("prompts/overseer-agent.txt")
+	instructions, err := utils.LoadPrompt(config.Get("SYSPROMPT_PATH"))
 	if err != nil {
-		log.Fatalf("Failed to load overseer agent instructions: %v", err)
+		return nil, err
 	}
 
 	// Create the overseer agent with handoffs
@@ -55,7 +54,7 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) *O
 		sessionStore: sessionStore,
 	}
 
-	return oa
+	return oa, nil
 }
 
 // Agent returns the underlying openai-agents-go instance

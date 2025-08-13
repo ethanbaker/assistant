@@ -6,6 +6,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/nlpodyssey/openai-agents-go v0.0.0-20250805015602-3edb98324224
+	github.com/openai/openai-go/v2 v2.0.2
 	github.com/stretchr/testify v1.10.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.1
