@@ -19,8 +19,6 @@ type Orchestrator struct {
 	overseerAgent agent.CustomAgent
 }
 
-var store *session.Store
-
 func main() {
 	// Load global configuration
 	cfg := utils.NewConfigFromEnv(".env")
@@ -35,7 +33,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize session store: %v", err)
 	}
-	store = sessionStore
 
 	// Initialize orchestrator
 	orchestrator := &Orchestrator{
@@ -65,12 +62,6 @@ func (o *Orchestrator) initializeOverseerAgent() {
 func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 	fmt.Println("Personal AI Assistant started. Type 'exit' to quit.")
 
-	// Create new session
-	sess, err := o.sessionStore.CreateSession(ctx, "user1")
-	if err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
-	}
-
 	for {
 		fmt.Print("\n> ")
 		var input string = "Hello! How are you doing today?"
@@ -85,7 +76,7 @@ func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 		}
 
 		// Route through overseer agent
-		response, err := o.executeAgentCall(ctx, sess, o.overseerAgent, input)
+		response, err := o.executeAgentCall(ctx, o.overseerAgent, input)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			continue
@@ -97,10 +88,10 @@ func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 	return nil
 }
 
-func (o *Orchestrator) executeAgentCall(ctx context.Context, sess *session.Session, targetAgent agent.CustomAgent, input string) (string, error) {
+func (o *Orchestrator) executeAgentCall(ctx context.Context, targetAgent agent.CustomAgent, input string) (string, error) {
 	// Create a session instance for the agent runner
-	s := session.NewSession("default-user")
-	s.SetDB(store.GetDB()) // Inject the database connection
+	s := session.NewSession("user-1")
+	s.SetDB(o.sessionStore.GetDB()) // Inject the database connection
 
 	// Initialize OpenAI agents runner
 	runner := agents.Runner{
@@ -117,16 +108,5 @@ func (o *Orchestrator) executeAgentCall(ctx context.Context, sess *session.Sessi
 
 	// Convert response to string for message storage
 	responseStr := fmt.Sprintf("%v", response)
-
-	// Save assistant response
-	assistantMsg := &session.Message{
-		SessionID: sess.ID,
-		Role:      "assistant",
-		Content:   responseStr,
-	}
-	if err := o.sessionStore.SaveMessage(ctx, assistantMsg); err != nil {
-		return "", fmt.Errorf("failed to save assistant message: %w", err)
-	}
-
 	return responseStr, nil
 }

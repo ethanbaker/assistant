@@ -129,8 +129,8 @@ func (ma *MemoryAgent) handleSearchSessions(ctx context.Context, arguments strin
 		if i >= 5 { // Limit to top 5 results
 			break
 		}
-		result += fmt.Sprintf("\n%d. [%s] %s", i+1, transcript.CreatedAt.Format("2006-01-02 15:04"), transcript.Content[:min(200, len(transcript.Content))])
-		if len(transcript.Content) > 200 {
+		result += fmt.Sprintf("\n%d. [%s] %s", i+1, transcript.CreatedAt.Format("2006-01-02 15:04"), transcript.Data[:min(200, len(transcript.Data))])
+		if len(transcript.Data) > 200 {
 			result += "..."
 		}
 	}
@@ -193,7 +193,7 @@ func (ma *MemoryAgent) handleSetFact(ctx context.Context, arguments string) (str
 }
 
 // handleListFacts handles listing all facts
-func (ma *MemoryAgent) handleListFacts(ctx context.Context, arguments string) (string, error) {
+func (ma *MemoryAgent) handleListFacts(ctx context.Context, _ string) (string, error) {
 	if ma.ShouldDryRun(ctx) {
 		return "DRY RUN: Would list all facts", nil
 	}
