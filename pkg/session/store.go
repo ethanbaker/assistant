@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/mysql"
@@ -34,7 +35,13 @@ func NewStore(databaseURL string) (*Store, error) {
 
 // CreateSession creates a new session in the database
 func (s *Store) CreateSession(ctx context.Context, userID string) (*Session, error) {
-	session := NewSession(userID)
+	session := &Session{
+		ID:     uuid.New(),
+		UserID: userID,
+		mu:     sync.Mutex{},
+		Items:  []*Item{},
+	}
+	session.db = s.db // Set the GORM DB connection
 
 	result := s.db.WithContext(ctx).Create(session)
 	if result.Error != nil {
@@ -59,6 +66,7 @@ func (s *Store) GetSession(ctx context.Context, sessionID uuid.UUID) (*Session, 
 		return nil, fmt.Errorf("failed to get session: %w", result.Error)
 	}
 
+	session.db = s.db // Set the GORM DB connection
 	return &session, nil
 }
 
@@ -106,6 +114,24 @@ func (s *Store) GetSessionItems(ctx context.Context, sessionID uuid.UUID) ([]*It
 	return items, nil
 }
 
+// DeleteSession deletes a session and its items from the database
+func (s *Store) DeleteSession(ctx context.Context, sessionID uuid.UUID) error {
+	// Start a transaction
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Delete items associated with the session
+		if err := tx.Where("session_id = ?", sessionID).Delete(&Item{}).Error; err != nil {
+			return fmt.Errorf("failed to delete session items: %w", err)
+		}
+
+		// Delete the session itself
+		if err := tx.Where("id = ?", sessionID).Delete(&Session{}).Error; err != nil {
+			return fmt.Errorf("failed to delete session: %w", err)
+		}
+
+		return nil
+	})
+}
+
 // SearchSessionTranscripts performs full-text search across session messages and tool calls
 func (s *Store) SearchSessionTranscripts(ctx context.Context, query string) ([]*SessionTranscript, error) {
 	var transcripts []*SessionTranscript
@@ -113,7 +139,7 @@ func (s *Store) SearchSessionTranscripts(ctx context.Context, query string) ([]*
 
 	// Search in items
 	var items []Item
-	result := s.db.WithContext(ctx).Where("content LIKE ?", searchPattern).
+	result := s.db.WithContext(ctx).Where("data LIKE ?", searchPattern).
 		Order("created_at DESC").Limit(50).Find(&items)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to search messages: %w", result.Error)

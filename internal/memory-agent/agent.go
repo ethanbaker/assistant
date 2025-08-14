@@ -20,13 +20,19 @@ type MemoryAgent struct {
 }
 
 // NewMemoryAgent creates a new memory agent
-func NewMemoryAgent(memoryStore *memory.Store, sessionStore *session.Store) *MemoryAgent {
+func NewMemoryAgent(memoryStore *memory.Store, sessionStore *session.Store) (*MemoryAgent, error) {
 	config := agent.LoadAgentConfig("memory-agent")
+
+	// Load instructions from file with fallback to hardcoded version
+	instructions, err := utils.LoadPrompt(config.Get("SYSPROMPT_PATH"))
+	if err != nil {
+		return nil, err
+	}
 
 	// Create the underlying agent
 	agentInstance := agents.New("memory-agent").
-		WithInstructions("You are a memory assistant that helps store, retrieve, and search through information and past conversations.").
-		WithModel("gpt-4o-mini")
+		WithInstructions(instructions).
+		WithModel(config.Get("MODEL"))
 
 	ma := &MemoryAgent{
 		agent:        agentInstance,
@@ -38,7 +44,7 @@ func NewMemoryAgent(memoryStore *memory.Store, sessionStore *session.Store) *Mem
 	// Register tools
 	ma.registerTools()
 
-	return ma
+	return ma, nil
 }
 
 // Agent returns the underlying openai-agents-go instance

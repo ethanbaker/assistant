@@ -64,7 +64,7 @@ func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 
 	for {
 		fmt.Print("\n> ")
-		var input string = "Hello! How are you doing today?"
+		var input string = "What is my name?"
 		/*
 			if _, err := fmt.Scanln(&input); err != nil {
 				continue
@@ -90,8 +90,13 @@ func (o *Orchestrator) startInteractiveSession(ctx context.Context) error {
 
 func (o *Orchestrator) executeAgentCall(ctx context.Context, targetAgent agent.CustomAgent, input string) (string, error) {
 	// Create a session instance for the agent runner
-	s := session.NewSession("user-1")
-	s.SetDB(o.sessionStore.GetDB()) // Inject the database connection
+	s, err := o.sessionStore.CreateSession(ctx, "user-1")
+	/*
+		s, err := o.sessionStore.GetSession(ctx, uuid.MustParse("d1f62b4e-f74f-447e-9070-ba548ce40d75"))
+		if err != nil {
+			return "", fmt.Errorf("failed to get session: %w", err)
+		}
+	*/
 
 	// Initialize OpenAI agents runner
 	runner := agents.Runner{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nlpodyssey/openai-agents-go/memory"
@@ -12,25 +13,16 @@ import (
 
 // Session represents a conversation session
 type Session struct {
-	*gorm.Model
+	ID        uuid.UUID      `json:"id" gorm:"type:char(36);primaryKey;unique;not null"`
+	CreatedAt time.Time      `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt time.Time      `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"column:deleted_at;index"`
 
-	ID     uuid.UUID `json:"id" gorm:"type:char(36);primaryKey"`
-	UserID string    `json:"user_id" gorm:"size:255"`
-	Items  []*Item   `json:"items,omitempty" gorm:"foreignKey:SessionID;constraint:OnDelete:CASCADE"`
+	UserID string  `json:"user_id" gorm:"size:255"`
+	Items  []*Item `json:"items,omitempty" gorm:"foreignKey:SessionID;constraint:OnDelete:CASCADE"`
 
 	db *gorm.DB   `json:"-" gorm:"-"` // db used in openai-agents-go
 	mu sync.Mutex `json:"-" gorm:"-"` // mutex for thread-safe access
-}
-
-// NewSession creates a new session with a generated UUID
-func NewSession(userID string) *Session {
-	return &Session{
-		Model:  &gorm.Model{},
-		ID:     uuid.New(),
-		UserID: userID,
-		mu:     sync.Mutex{},
-		Items:  []*Item{},
-	}
 }
 
 /** Message management methods **/
@@ -93,7 +85,9 @@ func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseIn
 	// Convert Item models to TResponseInputItem
 	var responseItems []memory.TResponseInputItem
 	for _, item := range items {
-		responseItems = append(responseItems, *item.ResponseItem)
+		if item.ResponseItem.TResponseInputItem != nil {
+			responseItems = append(responseItems, *item.ResponseItem.TResponseInputItem)
+		}
 	}
 
 	return responseItems, nil
@@ -115,10 +109,11 @@ func (s *Session) AddItems(ctx context.Context, responseItems []memory.TResponse
 	items := make([]*Item, 0, len(responseItems))
 	for _, responseItem := range responseItems {
 		items = append(items, &Item{
-			Model:        &gorm.Model{},
-			SessionID:    s.ID,
-			Session:      s,
-			ResponseItem: &responseItem,
+			SessionID: s.ID,
+			Session:   s,
+			ResponseItem: ResponseItemData{
+				TResponseInputItem: &responseItem,
+			},
 		})
 	}
 
@@ -164,7 +159,7 @@ func (s *Session) PopItem(ctx context.Context) (*memory.TResponseInputItem, erro
 	}
 
 	// Convert to TResponseInputItem
-	return item.ResponseItem, nil
+	return item.ResponseItem.TResponseInputItem, nil
 }
 
 // ClearSession clears all items for this session.

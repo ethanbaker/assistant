@@ -24,7 +24,10 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) (*
 	config := agent.LoadAgentConfig("overseer-agent")
 
 	// Create specialized agents for handoffs
-	memoryAgent := memoryagent.NewMemoryAgent(memoryStore, sessionStore)
+	memoryAgent, err := memoryagent.NewMemoryAgent(memoryStore, sessionStore)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create handoffs for each specialized agent
 	memoryHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
@@ -42,7 +45,7 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) (*
 	// Create the overseer agent with handoffs
 	agentInstance := agents.New("overseer-agent").
 		WithInstructions(instructions).
-		WithModel("gpt-4o-mini").
+		WithModel(config.Get("MODEL")).
 		WithHandoffs(
 			memoryHandoff,
 		)

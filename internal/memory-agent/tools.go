@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/nlpodyssey/openai-agents-go/agents"
+	"github.com/openai/openai-go/packages/param"
 )
 
 // registerTools registers the memory-related tools
@@ -23,8 +24,10 @@ func (ma *MemoryAgent) registerTools() {
 					"description": "Search query to find relevant conversations",
 				},
 			},
-			"required": []string{"query"},
+			"additionalProperties": false,
+			"required":             []string{"query"},
 		},
+		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
 			return ma.handleSearchSessions(ctx, arguments)
 		},
@@ -43,8 +46,10 @@ func (ma *MemoryAgent) registerTools() {
 					"description": "The key of the fact to retrieve",
 				},
 			},
-			"required": []string{"key"},
+			"additionalProperties": false,
+			"required":             []string{"key"},
 		},
+		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
 			return ma.handleGetFact(ctx, arguments)
 		},
@@ -67,8 +72,10 @@ func (ma *MemoryAgent) registerTools() {
 					"description": "The value of the fact",
 				},
 			},
-			"required": []string{"key", "value"},
+			"additionalProperties": false,
+			"required":             []string{"key", "value"},
 		},
+		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
 			return ma.handleSetFact(ctx, arguments)
 		},
@@ -80,8 +87,9 @@ func (ma *MemoryAgent) registerTools() {
 		Name:        "list_facts",
 		Description: "List all stored facts",
 		ParamsJSONSchema: map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
+			"type":                 "object",
+			"properties":           map[string]any{},
+			"additionalProperties": false,
 		},
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
 			return ma.handleListFacts(ctx, arguments)

@@ -1,13 +1,18 @@
 package memory
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
 // KeyFact represents a stored fact in the memory system
 type KeyFact struct {
-	*gorm.Model
-	ID    uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	ID        uint           `json:"id" gorm:"primaryKey;autoIncrement"`
+	CreatedAt time.Time      `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt time.Time      `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"column:deleted_at;index"`
+
 	Key   string `json:"key" gorm:"column:fact_key;unique;not null;size:255"`
 	Value string `json:"value" gorm:"type:text"`
 }
