@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	overseeragent "github.com/ethanbaker/assistant/internal/overseer-agent"
+	"github.com/ethanbaker/assistant/internal/agents/overseer"
+	"github.com/ethanbaker/assistant/internal/stores/memory"
+	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/agent"
-	"github.com/ethanbaker/assistant/pkg/memory"
-	"github.com/ethanbaker/assistant/pkg/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/go-sql-driver/mysql"
 	"github.com/nlpodyssey/openai-agents-go/agents"
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	// Create overseer agent
-	overseer, err := overseeragent.NewOverseerAgent(memoryStore, sessionStore, cfg)
+	overseer, err := overseer.NewOverseerAgent(memoryStore, sessionStore, cfg)
 	if err != nil {
 		log.Fatalf("[COMMANDLINE]: Failed to initialize overseer agent: %v", err)
 	}

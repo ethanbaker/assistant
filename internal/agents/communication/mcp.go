@@ -1,4 +1,4 @@
-package communicationagent
+package communication
 
 import (
 	"context"

@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nlpodyssey/openai-agents-go/memory"
-	"github.com/openai/openai-go/packages/param"
-	"github.com/openai/openai-go/responses"
+	"github.com/openai/openai-go/v2/packages/param"
+	"github.com/openai/openai-go/v2/responses"
 	"gorm.io/gorm"
 )
 

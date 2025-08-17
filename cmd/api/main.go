@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/ethanbaker/assistant/api"
+	"github.com/ethanbaker/assistant/internal/api"
 	"github.com/ethanbaker/assistant/pkg/utils"
 )
 

@@ -1,4 +1,4 @@
-package main
+package sdk
 
 import (
 	"bytes"
@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-// BackendClient wraps calls to the AI assistant backend
-type BackendClient struct {
+// Client wraps calls to the AI assistant backend
+type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-func NewBackendClient(baseURL string) *BackendClient {
-	return &BackendClient{
+func NewClient(baseURL string) *Client {
+	return &Client{
 		baseURL:    baseURL,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}
@@ -27,59 +27,53 @@ func NewBackendClient(baseURL string) *BackendClient {
 
 type Session struct {
 	UUID string `json:"uuid"`
-	// History and other fields may exist, but we only rely on UUID here
-}
-
-type CreateSessionRequest struct {
-	// Placeholder for future params (agent id, etc.)
-}
-
-type MessageRequest struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type MessageResponse struct {
-	Content string `json:"content"`
 }
 
 // Create a new session
-func (c *BackendClient) CreateSession(ctx context.Context, req *CreateSessionRequest) (*Session, error) {
+func (c *Client) CreateSession(ctx context.Context, req *CreateSessionRequest) (*Session, error) {
+	path := fmt.Sprintf("%s/api/agent/sessions", c.baseURL)
+
 	var out Session
-	if err := c.doJSON(ctx, http.MethodPost, "/api/agent/sessions", req, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, path, req, &out); err != nil {
 		return nil, err
 	}
+
 	return &out, nil
 }
 
 // Get a session by UUID
-func (c *BackendClient) GetSession(ctx context.Context, uuid string) (*Session, error) {
+func (c *Client) GetSession(ctx context.Context, uuid string) (*Session, error) {
+	path := fmt.Sprintf("%s/api/agent/sessions/%s", c.baseURL, uuid)
+
 	var out Session
-	path := fmt.Sprintf("/api/agent/sessions/%s", uuid)
 	if err := c.doJSON(ctx, http.MethodGet, path, nil, &out); err != nil {
 		return nil, err
 	}
+
 	return &out, nil
 }
 
 // Send a message to a session provided by UUID
-func (c *BackendClient) SendMessage(ctx context.Context, uuid string, msg *MessageRequest) (*MessageResponse, error) {
-	var out MessageResponse
-	path := fmt.Sprintf("/api/agent/sessions/%s/message", uuid)
+func (c *Client) SendMessage(ctx context.Context, uuid string, msg *PostMessageRequest) (*PostMessageResponse, error) {
+	path := fmt.Sprintf("%s/api/agent/sessions/%s/message", c.baseURL, uuid)
+
+	var out PostMessageResponse
 	if err := c.doJSON(ctx, http.MethodPost, path, msg, &out); err != nil {
 		return nil, err
 	}
+
 	return &out, nil
 }
 
 // Delete an existing session by UUID
-func (c *BackendClient) DeleteSession(ctx context.Context, uuid string) error {
-	path := fmt.Sprintf("/api/agent/sessions/%s", uuid)
+func (c *Client) DeleteSession(ctx context.Context, uuid string) error {
+	path := fmt.Sprintf("%s/api/agent/sessions/%s", c.baseURL, uuid)
+
 	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
 }
 
 // doJSON is a helper to perform JSON requests to the backend
-func (c *BackendClient) doJSON(ctx context.Context, method, path string, in any, out any) error {
+func (c *Client) doJSON(ctx context.Context, method, path string, in any, out any) error {
 	// Create request body if input is provided
 	var body io.Reader
 	if in != nil {

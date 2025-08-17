@@ -1,5 +1,5 @@
 // tools.go handles registering tools for the MemoryAgent
-package memoryagent
+package memory
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/nlpodyssey/openai-agents-go/agents"
-	"github.com/openai/openai-go/packages/param"
+	"github.com/openai/openai-go/v2/packages/param"
 )
 
 // registerTools registers the memory-related tools

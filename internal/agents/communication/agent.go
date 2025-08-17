@@ -1,11 +1,11 @@
-package communicationagent
+package communication
 
 import (
 	"context"
 	"errors"
 
-	"github.com/ethanbaker/assistant/pkg/memory"
-	"github.com/ethanbaker/assistant/pkg/session"
+	"github.com/ethanbaker/assistant/internal/stores/memory"
+	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )

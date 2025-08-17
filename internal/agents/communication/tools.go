@@ -1,5 +1,5 @@
 // tools.go handles registering tools for the CommunicationAgent
-package communicationagent
+package communication
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/nlpodyssey/openai-agents-go/agents"
-	"github.com/openai/openai-go/packages/param"
+	"github.com/openai/openai-go/v2/packages/param"
 )
 
 // registerTools registers the communication-related tools

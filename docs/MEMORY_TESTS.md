@@ -1,6 +1,6 @@
 # Memory Package Tests
 
-This directory contains comprehensive tests for the `pkg/memory` package, following the testing philosophy outlined in `docs/AGENT_TESTS.md` that emphasizes **functionality over coverage**.
+This directory contains comprehensive tests for the `pkg/stores/memory` package, following the testing philosophy outlined in `docs/AGENT_TESTS.md` that emphasizes **functionality over coverage**.
 
 ## Testing Philosophy
 
@@ -89,17 +89,17 @@ Tests verify proper context handling:
 
 Run all memory tests:
 ```bash
-go test ./pkg/memory/...
+go test ./pkg/stores/memory/...
 ```
 
 Run with verbose output:
 ```bash
-go test -v ./pkg/memory/...
+go test -v ./pkg/stores/memory/...
 ```
 
 Run specific test functions:
 ```bash
-go test -v ./pkg/memory/ -run TestStore_RealWorldScenario_UserSession
+go test -v ./pkg/stores/memory/ -run TestStore_RealWorldScenario_UserSession
 ```
 
 ## Test Coverage Focus Areas

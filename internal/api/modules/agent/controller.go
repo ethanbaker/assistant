@@ -4,13 +4,14 @@ import (
 	"net/http"
 
 	"github.com/ethanbaker/api/pkg/api_types"
+	"github.com/ethanbaker/assistant/pkg/sdk"
 	"github.com/gin-gonic/gin"
 )
 
 // CreateSession handles POST requests to create a new session
 func CreateSession(c *gin.Context) {
 	// Parse request body
-	var req CreateSessionRequest
+	var req sdk.CreateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(api_types.NewErrorResponse(http.StatusBadRequest, err.Error()).AsGinResponse())
 		return
@@ -47,7 +48,7 @@ func PostMessage(c *gin.Context) {
 	uuid := c.Param("uuid")
 
 	// Parse request body
-	var req PostMessageRequest
+	var req sdk.PostMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(api_types.NewErrorResponse(http.StatusBadRequest, err.Error()).AsGinResponse())
 		return
@@ -62,7 +63,7 @@ func PostMessage(c *gin.Context) {
 	}
 
 	// Construct response
-	resp := PostMessageResponse{
+	resp := sdk.PostMessageResponse{
 		Output: msg.FinalOutput,
 	}
 

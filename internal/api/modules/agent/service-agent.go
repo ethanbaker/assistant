@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log"
 
-	overseeragent "github.com/ethanbaker/assistant/internal/overseer-agent"
+	overseeragent "github.com/ethanbaker/assistant/internal/agents/overseer"
+	"github.com/ethanbaker/assistant/internal/stores/memory"
+	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/agent"
-	"github.com/ethanbaker/assistant/pkg/memory"
-	"github.com/ethanbaker/assistant/pkg/session"
+	"github.com/ethanbaker/assistant/pkg/sdk"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
@@ -86,7 +87,7 @@ func (o *Orchestrator) FindSession(ctx context.Context, sessionID string) (*sess
 }
 
 // Add a message to an existing session
-func (o *Orchestrator) AddMessage(ctx context.Context, sessionID string, req PostMessageRequest) (*agents.RunResult, error) {
+func (o *Orchestrator) AddMessage(ctx context.Context, sessionID string, req sdk.PostMessageRequest) (*agents.RunResult, error) {
 	// Parse the session ID
 	guid, err := uuid.Parse(sessionID)
 	if err != nil {

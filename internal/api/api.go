@@ -2,6 +2,7 @@ package api
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	api_utils "github.com/ethanbaker/api/pkg/utils"
@@ -9,8 +10,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	agent_module "github.com/ethanbaker/assistant/api/modules/agent"
-	health_module "github.com/ethanbaker/assistant/api/modules/health"
+	agent_module "github.com/ethanbaker/assistant/internal/api/modules/agent"
+	health_module "github.com/ethanbaker/assistant/internal/api/modules/health"
 )
 
 func Start(cfg *utils.Config) {
@@ -26,7 +27,7 @@ func Start(cfg *utils.Config) {
 
 	// Add CORS using gin-contrib/cors (https://github.com/gin-contrib/cors for documentation)
 	engine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     strings.Split(cfg.GetWithDefault("CORS_ALLOWED_ORIGINS", "*"), ","),
 		AllowMethods:     []string{"OPTIONS", "GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},

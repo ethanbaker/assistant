@@ -1,4 +1,4 @@
-package agent
+package sdk
 
 // CreateSessionRequest represents the request body for creating a new session
 type CreateSessionRequest struct {

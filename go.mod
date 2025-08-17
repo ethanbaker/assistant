@@ -6,11 +6,11 @@ require (
 	github.com/ethanbaker/api v1.1.1
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
-	github.com/go-sql-driver/mysql v1.9.1
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/nlpodyssey/openai-agents-go v0.0.0-20250805015602-3edb98324224
-	github.com/openai/openai-go v1.12.0
+	github.com/nlpodyssey/openai-agents-go v0.0.0-20250814182310-a49f6d088001
+	github.com/openai/openai-go/v2 v2.0.2
 	github.com/stretchr/testify v1.10.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.1
@@ -35,6 +35,9 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.7.5 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

@@ -1,13 +1,13 @@
-package overseeragent
+package overseer
 
 import (
 	"context"
 	"errors"
 
-	communicationagent "github.com/ethanbaker/assistant/internal/communication-agent"
-	memoryagent "github.com/ethanbaker/assistant/internal/memory-agent"
-	"github.com/ethanbaker/assistant/pkg/memory"
-	"github.com/ethanbaker/assistant/pkg/session"
+	communicationagent "github.com/ethanbaker/assistant/internal/agents/communication"
+	memoryagent "github.com/ethanbaker/assistant/internal/agents/memory"
+	"github.com/ethanbaker/assistant/internal/stores/memory"
+	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
