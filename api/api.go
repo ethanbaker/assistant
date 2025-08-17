@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/ethanbaker/api/pkg/config"
-	"github.com/ethanbaker/api/pkg/utils"
+	api_utils "github.com/ethanbaker/api/pkg/utils"
+	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
@@ -13,13 +13,13 @@ import (
 	health_module "github.com/ethanbaker/assistant/api/modules/health"
 )
 
-func Start() {
+func Start(cfg *utils.Config) {
 	// Initialized configuration settings
-	port := config.GetEnvWithDefault("API_PORT", "8080")
+	port := cfg.GetWithDefault("API_PORT", "8080")
 
 	// Add app level settings/routes
 	engine := gin.Default()
-	engine.NoRoute(utils.NoRouteHandler)
+	engine.NoRoute(api_utils.NoRouteHandler)
 
 	// Add trusted proxies
 	engine.SetTrustedProxies(nil)
@@ -39,7 +39,9 @@ func Start() {
 
 	// Adding custom modules
 	health_module.RegisterRoutes(baseGroup)
+
 	agent_module.RegisterRoutes(baseGroup)
+	agent_module.Init(cfg)
 
 	// Then after performing initial setup, start the server
 	if err := engine.Run(":" + port); err != nil {

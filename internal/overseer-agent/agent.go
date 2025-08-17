@@ -2,9 +2,10 @@ package overseeragent
 
 import (
 	"context"
+	"errors"
 
+	communicationagent "github.com/ethanbaker/assistant/internal/communication-agent"
 	memoryagent "github.com/ethanbaker/assistant/internal/memory-agent"
-	"github.com/ethanbaker/assistant/pkg/agent"
 	"github.com/ethanbaker/assistant/pkg/memory"
 	"github.com/ethanbaker/assistant/pkg/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
@@ -20,11 +21,14 @@ type OverseerAgent struct {
 }
 
 // NewOverseerAgent creates a new overseer agent with handoffs to all specialized agents
-func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) (*OverseerAgent, error) {
-	config := agent.LoadAgentConfig("overseer-agent")
-
+func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store, config *utils.Config) (*OverseerAgent, error) {
 	// Create specialized agents for handoffs
-	memoryAgent, err := memoryagent.NewMemoryAgent(memoryStore, sessionStore)
+	memoryAgent, err := memoryagent.NewMemoryAgent(memoryStore, sessionStore, config)
+	if err != nil {
+		return nil, err
+	}
+
+	communicationAgent, err := communicationagent.NewCommunicationAgent(memoryStore, sessionStore, config)
 	if err != nil {
 		return nil, err
 	}
@@ -36,8 +40,20 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) (*
 		ToolDescriptionOverride: "Hand off to the Memory Agent for storing facts, recalling information, or searching past conversations",
 	})
 
+	communicationHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
+		Agent:                   communicationAgent.Agent(),
+		ToolNameOverride:        "handoff_to_communication_agent",
+		ToolDescriptionOverride: "Hand off to the Communication Agent for sending messages, summarizing content from Telegram or Discord, or managing communication workflows",
+	})
+
+	// Get sysprompt path
+	path := config.Get("OVERSEER_SYSPROMPT_PATH")
+	if path == "" {
+		return nil, errors.New("OVERSEER_SYSPROMPT_PATH not set in environment")
+	}
+
 	// Load instructions from file with fallback to hardcoded version
-	instructions, err := utils.LoadPrompt(config.Get("SYSPROMPT_PATH"))
+	instructions, err := utils.LoadPrompt(path)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +64,7 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store) (*
 		WithModel(config.Get("MODEL")).
 		WithHandoffs(
 			memoryHandoff,
+			communicationHandoff,
 		)
 
 	oa := &OverseerAgent{

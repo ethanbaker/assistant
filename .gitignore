@@ -29,8 +29,14 @@ vendor/
 
 # Configuration and environment files
 .env
+.env.local
+.env.*
 config.yaml
 config.json
+
+# Telegram session files
+sessions/
+telegram.json
 
 # IDE/editor specific files
 *.vscode/

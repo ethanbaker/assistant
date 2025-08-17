@@ -10,6 +10,7 @@ import (
 	"github.com/ethanbaker/assistant/pkg/memory"
 	"github.com/ethanbaker/assistant/pkg/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
+	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
@@ -24,23 +25,30 @@ type Orchestrator struct {
 var orchestrator *Orchestrator
 
 // Create an assistant for the api to run off of
-func init() {
-	// Load global config
-	cfg := utils.NewConfigFromEnv(".env")
+func Init(cfg *utils.Config) {
+	// Create MySQL config
+	dbConfig := mysql.Config{
+		User:      cfg.Get("MYSQL_USER"),
+		Passwd:    cfg.Get("MYSQL_ROOT_PASSWORD"),
+		Net:       "tcp",
+		Addr:      fmt.Sprintf("%s:%s", cfg.Get("MYSQL_HOST"), cfg.Get("MYSQL_PORT")),
+		DBName:    cfg.Get("MYSQL_DATABASE"),
+		ParseTime: true,
+	}
 
 	// Initialize database connections to create stores
-	memoryStore, err := memory.NewStore(cfg.Get("DATABASE_URL"))
+	memoryStore, err := memory.NewStore(dbConfig.FormatDSN())
 	if err != nil {
 		log.Fatalf("[AGENT]: Failed to initialize memory store: %v", err)
 	}
 
-	sessionStore, err := session.NewStore(cfg.Get("DATABASE_URL"))
+	sessionStore, err := session.NewStore(dbConfig.FormatDSN())
 	if err != nil {
 		log.Fatalf("[AGENT]: Failed to initialize session store: %v", err)
 	}
 
 	// Create overseer agent
-	overseer, err := overseeragent.NewOverseerAgent(memoryStore, sessionStore)
+	overseer, err := overseeragent.NewOverseerAgent(memoryStore, sessionStore, cfg)
 	if err != nil {
 		log.Fatalf("[AGENT]: Failed to initialize overseer agent: %v", err)
 	}

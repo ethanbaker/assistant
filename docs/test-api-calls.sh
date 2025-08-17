@@ -17,14 +17,12 @@ curl -X GET http://localhost:8080/api/agent/sessions/419d669b-5324-451c-b8a4-5a2
 "
 
 # Add message to session
-: "
-curl -X POST http://localhost:8080/api/agent/sessions/419d669b-5324-451c-b8a4-5a208b3de469/message \
+curl -X POST http://localhost:8080/api/agent/sessions/4fb6097f-df7a-4433-81df-b34901e968f4/message \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: 2d78d012-29a7-4210-b427-3037e79dc33b" \
   -d '{
-    "content": "Hello! Can you remind me what we talked about last time?"
+    "content": "Hello! Read my telegram messages through the communication agent."
   }'
-"
 
 # Delete session
 : "

@@ -3,8 +3,8 @@ package memoryagent
 
 import (
 	"context"
+	"errors"
 
-	"github.com/ethanbaker/assistant/pkg/agent"
 	"github.com/ethanbaker/assistant/pkg/memory"
 	"github.com/ethanbaker/assistant/pkg/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
@@ -20,11 +20,15 @@ type MemoryAgent struct {
 }
 
 // NewMemoryAgent creates a new memory agent
-func NewMemoryAgent(memoryStore *memory.Store, sessionStore *session.Store) (*MemoryAgent, error) {
-	config := agent.LoadAgentConfig("memory-agent")
+func NewMemoryAgent(memoryStore *memory.Store, sessionStore *session.Store, config *utils.Config) (*MemoryAgent, error) {
+	// Get sysprompt path
+	path := config.Get("MEMORY_SYSPROMPT_PATH")
+	if path == "" {
+		return nil, errors.New("MEMORY_SYSPROMPT_PATH not set in environment")
+	}
 
 	// Load instructions from file with fallback to hardcoded version
-	instructions, err := utils.LoadPrompt(config.Get("SYSPROMPT_PATH"))
+	instructions, err := utils.LoadPrompt(path)
 	if err != nil {
 		return nil, err
 	}
