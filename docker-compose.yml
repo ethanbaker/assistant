@@ -1,7 +1,6 @@
 version: '3.8'
 
 # Use .env.docker file for environment variables
-# Run with: docker-compose --env-file .env.docker up
 
 services:
   mysql:
@@ -17,16 +16,34 @@ services:
     networks:
       - assistant-network
 
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./resources/config/searxng:/etc/searxng
+      - ./resources/cache/searxng:/var/cache/searxng
+    networks:
+      - assistant-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - GRANIAN_PORT=4000 # Manual port override to match settings.yml
+      # - SEARXNG_DEBUG=true
+
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: Dockerfile.api # env file copied in dockerfile
     ports:
       - "8080:8080"
     volumes:
-      - ./resources/sessions:/app/resources/sessions
+      - ./resources/config:/app/resources/config
     depends_on:
       mysql:
+        condition: service_healthy
+      searxng:
         condition: service_healthy
     networks:
       - assistant-network

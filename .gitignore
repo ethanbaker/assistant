@@ -33,10 +33,7 @@ vendor/
 .env.*
 config.yaml
 config.json
-
-# Telegram session files
-sessions/
-telegram.json
+resources/config/
 
 # IDE/editor specific files
 *.vscode/
@@ -51,6 +48,7 @@ telegram.json
 # Cache files
 .cache/
 cover.out
+resources/cache/
 
 # Debug bins
 *.dbg

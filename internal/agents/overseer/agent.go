@@ -6,6 +6,7 @@ import (
 
 	communicationagent "github.com/ethanbaker/assistant/internal/agents/communication"
 	memoryagent "github.com/ethanbaker/assistant/internal/agents/memory"
+	searchagent "github.com/ethanbaker/assistant/internal/agents/search"
 	"github.com/ethanbaker/assistant/internal/stores/memory"
 	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
@@ -33,6 +34,11 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store, co
 		return nil, err
 	}
 
+	searchAgent, err := searchagent.NewSearchAgent(memoryStore, sessionStore, config)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create handoffs for each specialized agent
 	memoryHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
 		Agent:                   memoryAgent.Agent(),
@@ -44,6 +50,12 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store, co
 		Agent:                   communicationAgent.Agent(),
 		ToolNameOverride:        "handoff_to_communication_agent",
 		ToolDescriptionOverride: "Hand off to the Communication Agent for sending messages, summarizing content from Telegram or Discord, or managing communication workflows",
+	})
+
+	searchHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
+		Agent:                   searchAgent.Agent(),
+		ToolNameOverride:        "handoff_to_search_agent",
+		ToolDescriptionOverride: "Hand off to the Search Agent for web searches, fetching URL content, finding current information, or researching topics on the internet",
 	})
 
 	// Get sysprompt path
@@ -65,6 +77,7 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store, co
 		WithHandoffs(
 			memoryHandoff,
 			communicationHandoff,
+			searchHandoff,
 		)
 
 	oa := &OverseerAgent{
