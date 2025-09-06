@@ -66,6 +66,10 @@ func (b *Bot) unregisterCommands() error {
 
 // handleApplicationCommand processes a slash command interaction
 func (b *Bot) handleApplicationCommand(i *discordgo.InteractionCreate) {
+	if i == nil {
+		return
+	}
+
 	name := i.ApplicationCommandData().Name
 
 	switch name {
@@ -86,7 +90,7 @@ func (b *Bot) handleAsk(i *discordgo.InteractionCreate) {
 	}
 
 	if strings.TrimSpace(prompt) == "" {
-		respondEphemeral(b.dg, i, "Please provide a prompt.")
+		respondEphemeral(b.dg, i, "Please provide a prompt")
 		return
 	}
 
@@ -107,18 +111,19 @@ func (b *Bot) handleAsk(i *discordgo.InteractionCreate) {
 		}
 
 		// Send the message to the session
-		resp, err := b.api.SendMessage(ctx, sess.UUID, &sdk.PostMessageRequest{Content: prompt})
+		resp, err := b.api.SendMessage(ctx, sess.ID, &sdk.PostMessageRequest{Content: prompt})
 		if err != nil {
 			editFollowup(b.dg, i, fmt.Sprintf("Failed to send message: %v", err))
 			return
 		}
 
-		// If the response is empty, just return filler
-		if resp.Output == "" {
+		// Send final output
+		output := strings.TrimSpace(resp.FinalOutput)
+		if output == "" {
 			editFollowup(b.dg, i, NO_CONTENT)
-			return
+		} else {
+			editFollowup(b.dg, i, output)
 		}
-		editFollowup(b.dg, i, fmt.Sprint(resp.Output))
 	}()
 }
 
@@ -133,6 +138,18 @@ func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
 
 	if strings.TrimSpace(prompt) == "" {
 		respondEphemeral(b.dg, i, "Please provide a prompt.")
+		return
+	}
+
+	// Make sure thread channel is configured
+	if b.threadChannelID == "" {
+		respondEphemeral(b.dg, i, "Thread channel is not configured.")
+		return
+	}
+
+	// Make sure this channel is the thread channel
+	if i.ChannelID != b.threadChannelID {
+		respondEphemeral(b.dg, i, fmt.Sprintf("Please use the <#%s> channel for conversations.", b.threadChannelID))
 		return
 	}
 
@@ -153,7 +170,7 @@ func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
 		}
 
 		// Seed conversation
-		resp, err := b.api.SendMessage(ctx, sess.UUID, &sdk.PostMessageRequest{
+		resp, err := b.api.SendMessage(ctx, sess.ID, &sdk.PostMessageRequest{
 			Content: prompt,
 		})
 		if err != nil {
@@ -163,7 +180,7 @@ func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
 
 		// Determine thread title: prefer resp.Summary, else truncate content
 		// TODO: call backend endpoint to summarize
-		title := fmt.Sprintf("Conversation %s", sess.UUID[:4])
+		title := fmt.Sprintf("Conversation %s", sess.ID[:4])
 
 		// Create thread under the configured parent channel
 		thread, err := b.dg.ThreadStartComplex(b.threadChannelID, &discordgo.ThreadStart{
@@ -177,14 +194,16 @@ func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
 		}
 
 		// Bind conversation to thread
-		b.conversations.Set(thread.ID, sess.UUID)
+		b.conversations.Set(thread.ID, sess.ID)
 
 		// Post initial content in thread
-		content := strings.TrimSpace(fmt.Sprint(resp.Output))
-		if content == "" {
+		output := strings.TrimSpace(resp.FinalOutput)
+		if output == "" {
 			editFollowup(b.dg, i, NO_CONTENT)
+		} else {
+			reply(b.dg, thread.ID, output)
 		}
 
-		editFollowup(b.dg, i, fmt.Sprintf("Created conversation thread: <%4s>", sess.UUID[:4]))
+		editFollowup(b.dg, i, fmt.Sprintf("Created conversation thread: <%4s>", sess.ID[:4]))
 	}()
 }

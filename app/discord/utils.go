@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -39,6 +40,28 @@ func editFollowup(s *discordgo.Session, i *discordgo.InteractionCreate, content 
 	for _, c := range chunks[1:] {
 		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: c})
 	}
+}
+
+// reply sends a message to the specified channel, chunking if necessary
+func reply(s *discordgo.Session, channelID, content string) {
+	// Chunk content to Discord limits (2000 chars)
+	for _, chunk := range chunkString(content, 1900) {
+		_, _ = s.ChannelMessageSend(channelID, chunk)
+	}
+}
+
+// errorReply sends a formated error message to the specified channel
+func errorReply(s *discordgo.Session, channelID, desc string, errs ...any) {
+	// Create error message
+	errorMsg := ""
+	for _, e := range errs {
+		errorMsg += fmt.Sprintf("\n > %v\n\n", e)
+	}
+
+	// Send to channel
+	output := fmt.Sprintf("Error: %s %s", desc, errorMsg)
+	reply(s, channelID, output)
+	log.Printf("[DISCORD]: %s", output)
 }
 
 // chunkString splits a long string into smaller chunks, ensuring no chunk exceeds the specified size

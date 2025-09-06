@@ -27,15 +27,6 @@ type Session struct {
 
 /** Message management methods **/
 
-// AddItem adds an item to the session's message list
-func (s *Session) AddItem(item *Item) {
-	// Set session reference
-	item.SessionID = s.ID
-	item.Session = s
-
-	s.Items = append(s.Items, item)
-}
-
 // GetItemCount returns the number of items in the session
 func (s *Session) GetItemCount() int {
 	if s.Items == nil {
@@ -52,6 +43,21 @@ func (s *Session) GetLastItem() *Item {
 	return s.Items[len(s.Items)-1]
 }
 
+// Get the latest n items from a session
+func (s *Session) GetLatestItems(ctx context.Context, n int) []Item {
+	var items []Item
+
+	if n <= 0 || n > len(s.Items) {
+		return items
+	}
+
+	for i := range n {
+		items = append(items, *s.Items[len(s.Items)-1-i])
+	}
+
+	return items
+}
+
 /** memory.Session interface methods **/
 
 // SessionID returns the session ID as a string
@@ -59,7 +65,7 @@ func (s *Session) SessionID(ctx context.Context) string {
 	return s.ID.String()
 }
 
-// GetItems retrieves the conversation history for this session.
+// GetItems retrieves the conversation history for this session as response input items
 // limit is the maximum number of items to retrieve. If <= 0, retrieves all items.
 // When specified, returns the latest N items in chronological order.
 func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseInputItem, error) {

@@ -35,8 +35,8 @@ type Bot struct {
 // ConversationStore is a simple in-memory store for managing conversations and their associated session UUIDs
 // Keying strategy:
 // - For channel free-chat: key is channelID
-// - For `/ask` command: create temp conversation per interaction
 // - For thread conversation: key is threadID
+// '/ask' commands are not stored here, as they are one-off and don't require persistence
 type ConversationStore struct {
 	channel map[string]string // unique mapping (channelID, threadID, etc) -> session UUID
 }
@@ -96,10 +96,15 @@ func NewBot(cfg *utils.Config) (*Bot, error) {
 		log.Println("GUILD_ID not set, using global commands")
 	}
 
-	// Get base URL
+	// Get base URL and api key
 	baseURL := cfg.Get("BACKEND_BASE_URL")
 	if baseURL == "" {
 		return nil, fmt.Errorf("BACKEND_BASE_URL not set in config or environment")
+	}
+
+	apiKey := cfg.Get("BACKEND_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("BACKEND_API_KEY not set in config or environment")
 	}
 
 	// Create a new Discord session
@@ -112,7 +117,7 @@ func NewBot(cfg *utils.Config) (*Bot, error) {
 	b := &Bot{
 		config:                    cfg,
 		dg:                        dg,
-		api:                       sdk.NewClient(baseURL),
+		api:                       sdk.NewClient(baseURL, apiKey),
 		conversations:             NewConversationStore(),
 		botChannelID:              botChannelID,
 		botChannelContextLimit:    botChannelContextLimit,
@@ -154,7 +159,7 @@ func (b *Bot) Stop() error {
 
 // onReady is called when the bot is ready
 func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
-	log.Printf("[DISCORD]: logged in as: %s#%s", r.User.Username, r.User.Discriminator)
+	log.Printf("[DISCORD]: Logged in as: %s#%s", r.User.Username, r.User.Discriminator)
 }
 
 // onMessageCreate handles incoming messages
@@ -195,12 +200,12 @@ func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, con
 			UserID: user.ID,
 		})
 		if err != nil {
-			b.reply(channelID, fmt.Sprintf("Failed to create session: %v", err))
+			errorReply(b.dg, channelID, "Failed to create session", err)
 			return
 		}
 
 		// Bind the session to the channel
-		conversationID = sess.UUID
+		conversationID = sess.ID
 		b.conversations.Set(channelID, conversationID)
 	}
 
@@ -209,19 +214,13 @@ func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, con
 		Content: decorateDiscordContext(user, content),
 	})
 	if err != nil {
-		b.reply(channelID, fmt.Sprintf("Failed to send message: %v", err))
+		errorReply(b.dg, channelID, "Failed to send message", err)
 		return
 	}
 
 	// If the response is empty, just return filler
-	if resp.Output != "" {
-		b.reply(channelID, fmt.Sprint(resp.Output))
-	}
-}
-
-func (b *Bot) reply(channelID, content string) {
-	// Chunk content to Discord limits (2000 chars)
-	for _, chunk := range chunkString(content, 1900) {
-		_, _ = b.dg.ChannelMessageSend(channelID, chunk)
+	output := strings.TrimSpace(resp.FinalOutput)
+	if output != "" {
+		reply(b.dg, channelID, output)
 	}
 }

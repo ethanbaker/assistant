@@ -143,3 +143,27 @@ func (o *Orchestrator) RemoveSession(ctx context.Context, sessionID string) (*se
 
 	return sess, nil
 }
+
+// Get the latest 'n' items from memory store by session id
+func (o *Orchestrator) GetDBItemsBySessionID(ctx context.Context, sessionID string, limit int) ([]session.Item, error) {
+	// Find the session
+	sess, err := o.FindSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return sess.GetLatestItems(ctx, limit), nil
+}
+
+// Find the item count for a session
+func (o *Orchestrator) GetItemCountBySessionID(ctx context.Context, sessionID string) (int, error) {
+	// Find the session
+	sess, err := o.FindSession(ctx, sessionID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Get item count from the session
+	count := sess.GetItemCount()
+	return count, nil
+}
