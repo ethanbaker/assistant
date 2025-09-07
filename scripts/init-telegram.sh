@@ -7,34 +7,45 @@ echo "Telegram MCP Session Initialization"
 echo "======================================"
 echo ""
 
+echo "Usage: $0 <env_file>"
+
+if [ $# -ne 1 ]; then
+    echo "Please provide an env file"
+    exit 0
+fi
+
+env_file=$1
+
+echo "Using env file: $env_file"
+
 # Check if .env file exists
-if [ ! -f ".env" ]; then
+if [ ! -f $env_file ]; then
     echo ".env file not found!"
-    exit 1
+    exit 0
 fi
 
 # Source environment variables
-source .env
+source $env_file
 
 # Validate required environment variables
 if [ -z "$TG_PHONE_NUMBER" ]; then
-    echo "TG_PHONE_NUMBER not set in .env file"
-    echo "Please edit .env and set your phone number (with country code, e.g., +1234567890)"
+    echo "TG_PHONE_NUMBER not set in $env_file"
+    echo "Please edit $env_file and set your phone number (with country code, e.g., +1234567890)"
     exit 0
 fi
 
 if [ -z "$TG_APP_ID" ]; then
-    echo "TG_APP_ID not set in .env file"
+    echo "TG_APP_ID not set in $env_file"
     exit 0
 fi
 
 if [ -z "$TG_API_HASH" ]; then
-    echo "TG_API_HASH not set in .env file"
+    echo "TG_API_HASH not set in $env_file"
     exit 0
 fi
 
 if [ -z "$TG_SESSION_PATH" ]; then
-    echo "TG_SESSION_PATH not set in .env file"
+    echo "TG_SESSION_PATH not set in $env_file"
     exit 0
 fi
 
@@ -47,8 +58,10 @@ echo ""
 
 echo "Starting Telegram MCP session initialization..."
 
-npx -y @chaindead/telegram-mcp
+npx -y @chaindead/telegram-mcp auth \
     --phone "$TG_PHONE_NUMBER" \
     --app-id "$TG_APP_ID" \
     --api-hash "$TG_API_HASH" \
     --session "$TG_SESSION_PATH"
+
+exit 0
