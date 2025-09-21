@@ -3,15 +3,21 @@ module github.com/ethanbaker/assistant
 go 1.24.3
 
 require (
+	github.com/arran4/golang-ical v0.3.2
+	github.com/dstotijn/go-notion v0.11.0
 	github.com/ethanbaker/api v1.1.1
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/nathan-osman/go-sunrise v1.1.0
 	github.com/nlpodyssey/openai-agents-go v0.0.0-20250814182310-a49f6d088001
 	github.com/openai/openai-go/v2 v2.0.2
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.10.0
+	github.com/teambition/rrule-go v1.8.2
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.30.1
 )
@@ -69,5 +75,4 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

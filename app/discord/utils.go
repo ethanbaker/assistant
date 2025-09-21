@@ -50,6 +50,12 @@ func reply(s *discordgo.Session, channelID, content string) {
 	}
 }
 
+// replySanitizeHTML sends a message to the specified channel, sanitizing HTML to Discord markdown and chunking if necessary
+func replySanitizeHTML(s *discordgo.Session, channelID, content string) {
+	sanitized := sanitizeHTMLToDiscordMarkdown(content)
+	reply(s, channelID, sanitized)
+}
+
 // errorReply sends a formated error message to the specified channel
 func errorReply(s *discordgo.Session, channelID, desc string, errs ...any) {
 	// Create error message
@@ -102,4 +108,69 @@ func decorateDiscordContext(user *discordgo.User, content string) string {
 		uname = user.GlobalName
 	}
 	return fmt.Sprintf("[discord user: %s] %s", uname, content)
+}
+
+// Define HTML tag to Discord markdown mappings
+var replacements = map[string][2]string{
+	// Bold tags
+	"strong": {"**", "**"},
+	"b":      {"**", "**"},
+
+	// Italic tags
+	"em": {"*", "*"},
+	"i":  {"*", "*"},
+
+	// Underline tags (Discord uses __ for underline)
+	"u": {"__", "__"},
+
+	// Strikethrough tags
+	"s":      {"~~", "~~"},
+	"strike": {"~~", "~~"},
+	"del":    {"~~", "~~"},
+
+	// Code tags
+	"code": {"`", "`"},
+
+	// Preformatted text (code blocks)
+	"pre": {"```", "```"},
+}
+
+// sanitizeHTMLToDiscordMarkdown converts HTML elements to Discord markdown
+func sanitizeHTMLToDiscordMarkdown(content string) string {
+	result := content
+
+	// Process each tag type
+	for tag, markdown := range replacements {
+		// Create case-insensitive regex patterns for opening and closing tags
+		openPattern := fmt.Sprintf(`(?i)<%s[^>]*>`, tag)
+		closePattern := fmt.Sprintf(`(?i)</%s>`, tag)
+
+		// Replace opening tags with opening markdown
+		openRe := regexp.MustCompile(openPattern)
+		result = openRe.ReplaceAllString(result, markdown[0])
+
+		// Replace closing tags with closing markdown
+		closeRe := regexp.MustCompile(closePattern)
+		result = closeRe.ReplaceAllString(result, markdown[1])
+	}
+
+	// Handle special cases for code blocks with language specification
+	preCodeRe := regexp.MustCompile(`(?i)<pre><code[^>]*class="language-([^"]*)"[^>]*>`)
+	result = preCodeRe.ReplaceAllStringFunc(result, func(match string) string {
+		langMatch := regexp.MustCompile(`(?i)class="language-([^"]*)"`)
+		langMatches := langMatch.FindStringSubmatch(match)
+		if len(langMatches) > 1 {
+			return fmt.Sprintf("```%s", langMatches[1])
+		}
+		return "```"
+	})
+
+	// Clean up any remaining HTML tags that weren't converted
+	htmlTagRe := regexp.MustCompile(`<[^>]*>`)
+	result = htmlTagRe.ReplaceAllString(result, "")
+
+	// Clean up extra whitespace
+	result = strings.TrimSpace(result)
+
+	return result
 }

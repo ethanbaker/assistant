@@ -12,6 +12,7 @@ import (
 
 	agent_module "github.com/ethanbaker/assistant/internal/api/modules/agent"
 	health_module "github.com/ethanbaker/assistant/internal/api/modules/health"
+	outreach_module "github.com/ethanbaker/assistant/internal/api/modules/outreach"
 )
 
 func Start(cfg *utils.Config) {
@@ -43,6 +44,11 @@ func Start(cfg *utils.Config) {
 
 	agent_module.RegisterRoutes(baseGroup)
 	agent_module.Init(cfg)
+
+	outreach_module.RegisterRoutes(baseGroup)
+	if err := outreach_module.Init(cfg); err != nil {
+		log.Fatal("[API-MAIN]: Failed to initialize outreach module: ", err)
+	}
 
 	// Then after performing initial setup, start the server
 	if err := engine.Run(":" + port); err != nil {

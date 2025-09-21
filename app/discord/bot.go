@@ -30,6 +30,7 @@ type Bot struct {
 	threadChannelID           string // Channel ID where conversation threads are created
 	threadChannelContextLimit int    // Limit for thread context messages
 	guildID                   string // Guild ID for slash commands (empty for global)
+	userID                    string // User ID for outreach messages
 }
 
 // ConversationStore is a simple in-memory store for managing conversations and their associated session UUIDs
@@ -91,6 +92,11 @@ func NewBot(cfg *utils.Config) (*Bot, error) {
 		return nil, fmt.Errorf("THREAD_CHANNEL_CONTEXT_LIMIT must be a positive integer")
 	}
 
+	userID := cfg.Get("USER_ID")
+	if userID == "" {
+		return nil, fmt.Errorf("USER_ID not set in config or environment")
+	}
+
 	guildID := cfg.Get("GUILD_ID") // empty = global commands
 	if guildID == "" {
 		log.Println("GUILD_ID not set, using global commands")
@@ -124,6 +130,7 @@ func NewBot(cfg *utils.Config) (*Bot, error) {
 		threadChannelID:           threadChannelID,
 		guildID:                   guildID,
 		threadChannelContextLimit: threadChannelContextLimit,
+		userID:                    userID,
 	}
 
 	// Intents
@@ -137,6 +144,15 @@ func NewBot(cfg *utils.Config) (*Bot, error) {
 	dg.AddHandler(b.onReady)
 	dg.AddHandler(b.onMessageCreate)
 	dg.AddHandler(b.onInteractionCreate)
+
+	// Outreach API
+	if err := b.registerOutreach(); err != nil {
+		return nil, err
+	}
+
+	log.Printf("[DISCORD]: Registered outreach callback for user ID %s", userID)
+
+	go b.startAPI()
 
 	return b, nil
 }
@@ -154,7 +170,15 @@ func (b *Bot) Start() error {
 // Stop the bot and clean up resources
 func (b *Bot) Stop() error {
 	_ = b.unregisterCommands()
-	return b.dg.Close()
+	if err := b.dg.Close(); err != nil {
+		return err
+	}
+
+	if err := b.unregisterOutreach(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // onReady is called when the bot is ready
@@ -188,7 +212,7 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 }
 
 // handleMessageInChannel processes messages in the bot channel or bound conversation channels
-func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, content string, msg *discordgo.Message) {
+func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, content string, _ *discordgo.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
