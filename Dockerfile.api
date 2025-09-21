@@ -24,7 +24,8 @@ FROM alpine:latest
 
 # Install dependencies
 # - nodejs, npm, and git for `npx` commands (MCP)
-RUN apk --no-cache add nodejs npm git
+# - tzdata for timezone support
+RUN apk --no-cache add nodejs npm git tzdata
 
 WORKDIR /app
 

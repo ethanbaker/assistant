@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	_ "time/tzdata" // Embed timezone database
 
 	ics "github.com/arran4/golang-ical"
 	notionapi "github.com/dstotijn/go-notion"

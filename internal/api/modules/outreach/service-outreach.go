@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -55,7 +54,7 @@ func Init(cfg *utils.Config) error {
 	var err error
 
 	// Load manager config
-	cfgPath := filepath.Join("resources", "config", "outreach", "config.yml")
+	cfgPath := cfg.Get("OUTREACH_CONFIG_PATH")
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		return fmt.Errorf("outreach config file not found at %s", cfgPath)
 	}
@@ -114,8 +113,10 @@ func Init(cfg *utils.Config) error {
 	// Start response listener
 	go service.listenForResponses()
 
+	taskPath := cfg.Get("OUTREACH_TASKS_PATH")
+
 	// Load tasks on startup
-	if err := service.loadTasksFromConfig(); err != nil {
+	if err := service.loadTasksFromConfig(taskPath); err != nil {
 		return fmt.Errorf("failed to load tasks from config: %w", err)
 	}
 
@@ -165,17 +166,15 @@ func (s *OutreachService) listenForResponses() {
 }
 
 // loadTasksFromConfig is a helper function to loads tasks from the configuration file
-func (s *OutreachService) loadTasksFromConfig() error {
-	configPath := filepath.Join("resources", "config", "outreach", "tasks.yml")
-
+func (s *OutreachService) loadTasksFromConfig(path string) error {
 	// Check if file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		log.Printf("[OUTREACH]: Tasks configuration file not found at %s, skipping task loading", configPath)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		log.Printf("[OUTREACH]: Tasks configuration file not found at %s, skipping task loading", path)
 		return nil
 	}
 
 	// Read file
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read tasks configuration file: %w", err)
 	}
