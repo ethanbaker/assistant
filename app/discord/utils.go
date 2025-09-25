@@ -127,6 +127,9 @@ var replacements = map[string][2]string{
 	"s":      {"~~", "~~"},
 	"strike": {"~~", "~~"},
 	"del":    {"~~", "~~"},
+
+	// Blockquote tags
+	"blockquote": {"\n> ", "\n"},
 }
 
 // sanitizeHTMLToDiscordMarkdown converts HTML elements to Discord markdown

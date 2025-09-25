@@ -35,7 +35,7 @@ func CreateDailyDigest(cfg *utils.Config) *outreach.TaskReturn {
 
 	// Return the last error if we only fail
 	return &outreach.TaskReturn{
-		Content: fmt.Sprintf("Error getting daily digest\n<BLOCKQUOTE>Error: %v", err),
+		Content: fmt.Sprintf("Error getting daily digest<BLOCKQUOTE>Error: %v</BLOCKQUOTE>", err),
 		Data:    nil,
 	}
 }
@@ -199,7 +199,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 
 	// Add calendar events to the output
 	if len(schedule.Results) != 0 {
-		output += "<STRONG>Schedule:<STRONG>\n"
+		output += "<STRONG>Schedule:</STRONG>\n"
 	}
 
 	for _, event := range calendarEvents {
@@ -213,7 +213,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 	}
 
 	if len(tasks.Results) != 0 {
-		output += "\n<STRONG>Upcoming Tasks:<STRONG>\n"
+		output += "\n<STRONG>Upcoming Tasks:</STRONG>\n"
 	}
 
 	// Loop for each task page
@@ -246,7 +246,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		}
 
 		if project != "" {
-			project = "<EM>" + project + "<EM>"
+			project = "<EM>" + project + "</EM>"
 		}
 
 		// Get the date of the task
@@ -266,7 +266,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 	}
 
 	if len(criticalTasks.Results) != 0 {
-		output += "\n<STRONG>Critical Tasks:<STRONG>\n"
+		output += "\n<STRONG>Critical Tasks:</STRONG>\n"
 	}
 
 	// Loop for each task page
@@ -299,7 +299,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		}
 
 		if project != "" {
-			project = "<EM>" + project + "<EM>"
+			project = "<EM>" + project + "</EM>"
 		}
 
 		// Get the date of the task
@@ -322,7 +322,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		}
 
 		if len(recurring.Results) != 0 {
-			output += fmt.Sprintf("\n<STRONG>%vs:<STRONG>\n", t)
+			output += fmt.Sprintf("\n<STRONG>%vs:</STRONG>\n", t)
 		}
 
 		// Loop for each task page
