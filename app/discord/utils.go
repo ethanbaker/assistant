@@ -127,12 +127,6 @@ var replacements = map[string][2]string{
 	"s":      {"~~", "~~"},
 	"strike": {"~~", "~~"},
 	"del":    {"~~", "~~"},
-
-	// Code tags
-	"code": {"`", "`"},
-
-	// Preformatted text (code blocks)
-	"pre": {"```", "```"},
 }
 
 // sanitizeHTMLToDiscordMarkdown converts HTML elements to Discord markdown
@@ -142,7 +136,8 @@ func sanitizeHTMLToDiscordMarkdown(content string) string {
 	// Process each tag type
 	for tag, markdown := range replacements {
 		// Create case-insensitive regex patterns for opening and closing tags
-		openPattern := fmt.Sprintf(`(?i)<%s[^>]*>`, tag)
+		// Use word boundaries to prevent partial matches (e.g., <s> matching <strong>)
+		openPattern := fmt.Sprintf(`(?i)<%s(\s[^>]*|/?)>`, tag)
 		closePattern := fmt.Sprintf(`(?i)</%s>`, tag)
 
 		// Replace opening tags with opening markdown
@@ -160,10 +155,18 @@ func sanitizeHTMLToDiscordMarkdown(content string) string {
 		langMatch := regexp.MustCompile(`(?i)class="language-([^"]*)"`)
 		langMatches := langMatch.FindStringSubmatch(match)
 		if len(langMatches) > 1 {
-			return fmt.Sprintf("```%s", langMatches[1])
+			return fmt.Sprintf("```%s\n", langMatches[1])
 		}
 		return "```"
 	})
+
+	// Handle preformatted text without language specification
+	result = regexp.MustCompile(`(?i)<pre><code>`).ReplaceAllString(result, "```\n")
+	result = regexp.MustCompile(`(?i)</code></pre>`).ReplaceAllString(result, "\n```")
+
+	// Now check inline code tags
+	inlineCodeRe := regexp.MustCompile(`(?i)<code>(.*?)</code>`)
+	result = inlineCodeRe.ReplaceAllString(result, "`$1`")
 
 	// Clean up any remaining HTML tags that weren't converted
 	htmlTagRe := regexp.MustCompile(`<[^>]*>`)
