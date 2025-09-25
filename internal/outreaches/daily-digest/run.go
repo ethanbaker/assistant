@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	ics "github.com/arran4/golang-ical"
@@ -44,12 +45,73 @@ func CreateDailyDigest(cfg *utils.Config) *outreach.TaskReturn {
 func getDailyDigest(_ *utils.Config) (string, error) {
 	var output string
 
-	// Find 'today' in the calendar's timezone (assuming there is only one)
+	var events []Event
+
+	// Get calendar events
+	calendarEvents := getCalendarEvents()
+	events = append(events, calendarEvents...)
+
+	// Get schedule database events
+	scheduleEvents, err := getScheduleDatabaseEvents()
+	if err != nil {
+		return "", err
+	}
+	events = append(events, scheduleEvents...)
+
+	// Sort events
+	for i := 1; i < len(events); i++ {
+		event := events[i]
+		j := i - 1
+
+		for j >= 0 && events[j].Start.Compare(event.Start) > 0 {
+			events[j+1] = events[j]
+			j--
+		}
+		events[j+1] = event
+	}
+
+	// Add calendar events to the output
+	if len(events) != 0 {
+		output += "<STRONG>Schedule:</STRONG>\n"
+	}
+
+	for _, event := range events {
+		output += fmt.Sprintf("- %v: %v\n", event.Timespan, event.Title)
+	}
+
+	// Add upcoming tasks content
+	upcomingTasks, err := getUpcomingTasks()
+	if err != nil {
+		return "", err
+	}
+	output += upcomingTasks
+
+	// Add critical tasks content
+	criticalTasks, err := getCriticalTasks()
+	if err != nil {
+		return "", err
+	}
+	output += criticalTasks
+
+	// Add recurring tasks content
+	recurringTasks, err := getRecurringTasks()
+	if err != nil {
+		return "", err
+	}
+	output += recurringTasks
+
+	return output, nil
+}
+
+// Helper method to get events from the calendars
+func getCalendarEvents() []Event {
+	calendarEvents := []Event{}
+
+	// Find 'today' in the calendar's timezone (assuming there is only one timezone)
 	year, month, day := time.Now().In(formatLoc).Date()
 	today := time.Date(year, month, day, 0, 0, 0, 0, formatLoc)
 
-	// Get calendar information
-	calendarEvents := []Event{}
+	// Loop through each calendar event
 	for _, calendar := range calendars {
 		for _, event := range calendar.Events() {
 			// Get the name
@@ -96,7 +158,7 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 				startDay = start
 				endDay = startDay.Add(24 * time.Hour)
 
-				// Check if the next occurence
+				// Check if the next occurence is excluded
 				for _, prop := range event.Properties {
 					if prop.IANAToken == "EXDATE" {
 						// Get the time from the EXDATE
@@ -115,32 +177,73 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 				}
 			}
 
+			// Set flags
+			isBusy := strings.Contains(strings.ToLower(name.BaseProperty.Value), "busy")
+
 			if allDayEvent {
 				// Add an all day event
 				if (today.After(startDay) || today.Equal(startDay)) && today.Before(endDay) {
 					calendarEvents = append(calendarEvents, Event{
-						Start:  start,
-						AllDay: true,
-						Format: fmt.Sprintf("- All Day: %v\n", name.BaseProperty.Value),
+						Start:    start,
+						Title:    name.BaseProperty.Value,
+						Timespan: "All Day",
+						IsBusy:   isBusy,
+						IsAllDay: true,
 					})
 				}
 			} else {
 				// Normal days have no errors from end days or end times
 				if today.Day() == start.Day() && today.Month() == start.Month() && today.Year() == start.Year() {
 					calendarEvents = append(calendarEvents, Event{
-						Start:  start,
-						AllDay: false,
-						Format: fmt.Sprintf("- %v → %v: %v\n", start.In(formatLoc).Format("03:04 PM"), end.In(formatLoc).Format("03:04 PM"), name.BaseProperty.Value),
+						Start:    start,
+						Title:    name.BaseProperty.Value,
+						Timespan: fmt.Sprintf("%v → %v", start.In(formatLoc).Format("3:04 PM"), end.In(formatLoc).Format("3:04 PM")),
+						IsBusy:   isBusy,
+						IsAllDay: false,
 					})
 				}
 			}
 		}
 	}
 
+	// Remove duplicate "busy" events (name = "Busy", same time as another event)
+	uniqueEvents := []Event{}
+	for _, event := range calendarEvents {
+		// If not busy, always add
+		if !event.IsBusy {
+			uniqueEvents = append(uniqueEvents, event)
+			continue
+		}
+
+		// Check if there is another event at the same time
+		duplicate := false
+		for _, other := range calendarEvents {
+			if !other.IsBusy && event.Timespan == other.Timespan {
+				// Matching non-busy event found, do not add
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			uniqueEvents = append(uniqueEvents, event)
+		}
+	}
+
+	return uniqueEvents
+}
+
+// Helper function to get events from the schedule database
+func getScheduleDatabaseEvents() ([]Event, error) {
+	var scheduleEvents []Event
+
+	// Find "today"
+	year, month, day := time.Now().In(formatLoc).Date()
+	today := time.Date(year, month, day, 0, 0, 0, 0, formatLoc)
+
 	// Get the schedule database
 	schedule, err := notion.QueryDatabase(context.Background(), SCHEDULE_ITEMS.ID, &SCHEDULE_ITEMS.Query)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Loop for each task page
@@ -148,13 +251,13 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		// Get the page property IDs from Notion
 		page, err := notion.FindPageByID(context.Background(), p.ID)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		// Get the page property values from their IDs
 		properties, ok := page.Properties.(notionapi.DatabasePageProperties)
 		if !ok {
-			return "", err
+			return nil, err
 		}
 
 		// Get the name of the task
@@ -168,43 +271,41 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		startField := properties["Date"]
 		start := startField.Date.Start.Time
 
-		var end time.Time
+		// Only add if the start date is today
+		if start.Day() != today.Day() {
+			continue
+		}
+
+		// Get the end time if it exists. If end time doesn't exist, it is an all day event
+		var end *time.Time
 		if startField.Date.End != nil {
-			end = startField.Date.End.Time
-		} else {
-			end = start.Add(1 * time.Hour) // Default to 1 hour default span if no end time (notion task was dragged from all day to a specific time)
+			end = &startField.Date.End.Time
 		}
 
 		// Format timespan string
-		timespan := fmt.Sprintf("%v - %v", start.Format("3:04PM"), end.Format("3:04PM"))
+		var timespan string
+		if end == nil {
+			timespan = "All Day"
+		} else {
+			timespan = fmt.Sprintf("%v → %v", start.Format("3:04PM"), end.Format("3:04PM"))
+		}
 
 		// Add the event to the calendar events
-		calendarEvents = append(calendarEvents, Event{
-			Start:  start,
-			Format: fmt.Sprintf("- %v: %v\n", timespan, name),
+		scheduleEvents = append(scheduleEvents, Event{
+			Start:    start,
+			Title:    name,
+			Timespan: timespan,
+			IsBusy:   false,
+			IsAllDay: end == nil,
 		})
 	}
 
-	// Sort calendar events
-	for i := 1; i < len(calendarEvents); i++ {
-		event := calendarEvents[i]
-		j := i - 1
+	return scheduleEvents, nil
+}
 
-		for j >= 0 && calendarEvents[j].Start.Compare(event.Start) > 0 {
-			calendarEvents[j+1] = calendarEvents[j]
-			j--
-		}
-		calendarEvents[j+1] = event
-	}
-
-	// Add calendar events to the output
-	if len(schedule.Results) != 0 {
-		output += "<STRONG>Schedule:</STRONG>\n"
-	}
-
-	for _, event := range calendarEvents {
-		output += event.Format
-	}
+// Helper method to add upcoming tasks
+func getUpcomingTasks() (string, error) {
+	var output string
 
 	// Get the tasks page
 	tasks, err := notion.QueryDatabase(context.Background(), NORMAL_TASKS.ID, &NORMAL_TASKS.Query)
@@ -259,6 +360,13 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		output += fmt.Sprintf("- %v %v %v\n", name, project, date)
 	}
 
+	return output, nil
+}
+
+// Helper method to get critical tasks
+func getCriticalTasks() (string, error) {
+	var output string
+
 	// Get the tasks page
 	criticalTasks, err := notion.QueryDatabase(context.Background(), CRITICAL_TASKS.ID, &CRITICAL_TASKS.Query)
 	if err != nil {
@@ -311,6 +419,12 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 
 		output += fmt.Sprintf("- %v %v %v\n", name, project, date)
 	}
+
+	return output, nil
+}
+
+func getRecurringTasks() (string, error) {
+	var output string
 
 	// Get the recurring database sections
 	for _, t := range []string{"Connection", "Habit", "Chore"} {

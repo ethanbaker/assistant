@@ -18,9 +18,11 @@ type NotionDatabase struct {
 
 // Event type used to hold calendar events for nice formatting
 type Event struct {
-	Start  time.Time
-	Format string
-	AllDay bool
+	Start    time.Time
+	Title    string
+	Timespan string
+	IsBusy   bool
+	IsAllDay bool
 }
 
 // CalendarConfig holds the configuration for calendar integration
