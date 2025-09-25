@@ -66,7 +66,7 @@ validate_env() {
     
     if [[ -z "$MYSQL_HOST" ]]; then missing_vars+=("MYSQL_HOST"); fi
     if [[ -z "$MYSQL_PORT" ]]; then missing_vars+=("MYSQL_PORT"); fi
-    if [[ -z "$MYSQL_USER" ]]; then missing_vars+=("MYSQL_USER"); fi
+    if [[ -z "$MYSQL_USERNAME" ]]; then missing_vars+=("MYSQL_USERNAME"); fi
     if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then missing_vars+=("MYSQL_ROOT_PASSWORD"); fi
     if [[ -z "$MYSQL_DATABASE" ]]; then missing_vars+=("MYSQL_DATABASE"); fi
     
@@ -84,11 +84,11 @@ validate_env() {
 # Function to check if MySQL is accessible
 check_mysql() {
     echo "Checking MySQL connection..."
-    mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "SELECT 1;" >/dev/null 2>&1 || {
+    mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USERNAME" -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "SELECT 1;" >/dev/null 2>&1 || {
         echo -e "${RED}Error: Cannot connect to MySQL database${NC}"
         echo "Host: $MYSQL_HOST:$MYSQL_PORT"
         echo "Database: $MYSQL_DATABASE"
-        echo "User: $MYSQL_USER"
+        echo "User: $MYSQL_USERNAME"
         exit 1
     }
     echo -e "${GREEN}MySQL connection successful${NC}"
@@ -110,7 +110,7 @@ create_implementation() {
                    client_secret = VALUES(client_secret),
                    updated_at = NOW();"
     
-    mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "$sql" || {
+    mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USERNAME" -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" -e "$sql" || {
         echo -e "${RED}Error: Failed to create implementation in database${NC}"
         exit 1
     }

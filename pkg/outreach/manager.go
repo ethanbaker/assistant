@@ -186,7 +186,7 @@ func (m *Manager) loadCronTask(task *Task) error {
 
 // executeTask runs a task and sends the response to the channel
 func (m *Manager) executeTask(task *Task) {
-	log.Printf("[OUTREACH]: Executing task: %s", task.Key)
+	//log.Printf("[OUTREACH]: Executing task: %s", task.Key)
 
 	// Get client IDs from task params
 	if len(task.ClientIds) == 0 {
@@ -238,7 +238,7 @@ func (m *Manager) executeTask(task *Task) {
 
 	// If output is nil, skip
 	if output == nil {
-		log.Printf("[OUTREACH]: Task '%s' returned nil output", task.Key)
+		//log.Printf("[OUTREACH]: Task '%s' returned nil output", task.Key)
 		return
 	}
 

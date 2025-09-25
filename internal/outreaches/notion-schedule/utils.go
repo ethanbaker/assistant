@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	notionapi "github.com/dstotijn/go-notion"
 	"github.com/ethanbaker/assistant/pkg/utils"
@@ -51,9 +52,15 @@ func fetchNotionEvents(_ *utils.Config) {
 			// Get the start and end of the task
 			startField := properties["Date"]
 			start := startField.Date.Start.Time
-			end := startField.Date.End.Time
 
-			// Format timespan string
+			var end time.Time
+			if startField.Date.End != nil {
+				end = startField.Date.End.Time
+			} else {
+				end = start.Add(1 * time.Hour) // Default to 1 hour default span if no end time (notion task was dragged from all day to a specific time)
+			}
+
+			// Format timespan
 			timespan := fmt.Sprintf("%v - %v", start.Format("3:04PM"), end.Format("3:04PM"))
 
 			// Add the event to the calendar events

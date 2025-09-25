@@ -167,7 +167,13 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		// Get the start and end of the task
 		startField := properties["Date"]
 		start := startField.Date.Start.Time
-		end := startField.Date.End.Time
+
+		var end time.Time
+		if startField.Date.End != nil {
+			end = startField.Date.End.Time
+		} else {
+			end = start.Add(1 * time.Hour) // Default to 1 hour default span if no end time (notion task was dragged from all day to a specific time)
+		}
 
 		// Format timespan string
 		timespan := fmt.Sprintf("%v - %v", start.Format("3:04PM"), end.Format("3:04PM"))

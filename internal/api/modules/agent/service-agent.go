@@ -29,7 +29,7 @@ var orchestrator *Orchestrator
 func Init(cfg *utils.Config) {
 	// Create MySQL config
 	dbConfig := mysql.Config{
-		User:      cfg.Get("MYSQL_USER"),
+		User:      cfg.Get("MYSQL_USERNAME"),
 		Passwd:    cfg.Get("MYSQL_ROOT_PASSWORD"),
 		Net:       "tcp",
 		Addr:      fmt.Sprintf("%s:%s", cfg.Get("MYSQL_HOST"), cfg.Get("MYSQL_PORT")),

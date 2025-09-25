@@ -53,4 +53,5 @@ volumes:
 
 networks:
   assistant-network:
+    name: assistant-network
     driver: bridge

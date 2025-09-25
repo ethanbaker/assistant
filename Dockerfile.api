@@ -22,6 +22,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main cmd/api/main.go
 # Use a minimal image for the final stage
 FROM alpine:latest
 
+ENV TZ="America/New_York"
+
 # Install dependencies
 # - nodejs, npm, and git for `npx` commands (MCP)
 # - tzdata for timezone support
