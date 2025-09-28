@@ -158,14 +158,14 @@ func sanitizeHTMLToDiscordMarkdown(content string) string {
 		langMatch := regexp.MustCompile(`(?i)class="language-([^"]*)"`)
 		langMatches := langMatch.FindStringSubmatch(match)
 		if len(langMatches) > 1 {
-			return fmt.Sprintf("```%s\n", langMatches[1])
+			return fmt.Sprintf("\n```%s\n", langMatches[1])
 		}
-		return "```"
+		return "```\n"
 	})
 
 	// Handle preformatted text without language specification
-	result = regexp.MustCompile(`(?i)<pre><code>`).ReplaceAllString(result, "```\n")
-	result = regexp.MustCompile(`(?i)</code></pre>`).ReplaceAllString(result, "\n```")
+	result = regexp.MustCompile(`(?i)<pre><code>`).ReplaceAllString(result, "\n```\n")
+	result = regexp.MustCompile(`(?i)</code></pre>`).ReplaceAllString(result, "```\n")
 
 	// Now check inline code tags
 	inlineCodeRe := regexp.MustCompile(`(?i)<code>(.*?)</code>`)

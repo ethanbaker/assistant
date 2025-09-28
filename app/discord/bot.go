@@ -15,13 +15,24 @@ import (
 const NO_CONTENT = "(no content)"
 const THREAD_ARCHIVE = 1440 // 24 hours
 
+// Store interface for managing conversations
+// Keying strategy:
+// - For channel free-chat: key is channelID
+// - For thread conversation: key is threadID
+// '/ask' commands are not stored here, as they are one-off and don't require persistence
+type ConversationStore interface {
+	Get(key string) (string, bool)
+	Set(key, uuid string)
+	Delete(key string)
+}
+
 // Bot represents the Discord bot instance
 type Bot struct {
 	config *utils.Config      // Configuration struct
 	dg     *discordgo.Session // Discord session
 	api    *sdk.Client        // Backend API client
 
-	conversations *ConversationStore // In-memory store for conversations
+	conversations ConversationStore // In-memory store for conversations
 
 	// Important configuration values
 	botChannelID           string // Channel ID where the bot listens for messages
@@ -33,38 +44,8 @@ type Bot struct {
 	userID                    string // User ID for outreach messages
 }
 
-// ConversationStore is a simple in-memory store for managing conversations and their associated session UUIDs
-// Keying strategy:
-// - For channel free-chat: key is channelID
-// - For thread conversation: key is threadID
-// '/ask' commands are not stored here, as they are one-off and don't require persistence
-type ConversationStore struct {
-	channel map[string]string // unique mapping (channelID, threadID, etc) -> session UUID
-}
-
-// NewConversationStore initializes a new ConversationStore
-func NewConversationStore() *ConversationStore {
-	return &ConversationStore{channel: make(map[string]string)}
-}
-
-// Get retrieves the session UUID for a given key (channel or thread ID)
-func (s *ConversationStore) Get(key string) (string, bool) {
-	v, ok := s.channel[key]
-	return v, ok
-}
-
-// Set associates a session UUID with a key (channel or thread ID)
-func (s *ConversationStore) Set(key, uuid string) {
-	s.channel[key] = uuid
-}
-
-// Delete removes the session UUID associated with a key (channel or thread ID)
-func (s *ConversationStore) Delete(key string) {
-	delete(s.channel, key)
-}
-
 // Create a new Discord bot instance
-func NewBot(cfg *utils.Config) (*Bot, error) {
+func NewBot(cfg *utils.Config, store ConversationStore) (*Bot, error) {
 	// Get discord token
 	token := cfg.Get("DISCORD_TOKEN")
 	if token == "" {
@@ -124,7 +105,7 @@ func NewBot(cfg *utils.Config) (*Bot, error) {
 		config:                    cfg,
 		dg:                        dg,
 		api:                       sdk.NewClient(baseURL, apiKey),
-		conversations:             NewConversationStore(),
+		conversations:             store,
 		botChannelID:              botChannelID,
 		botChannelContextLimit:    botChannelContextLimit,
 		threadChannelID:           threadChannelID,
