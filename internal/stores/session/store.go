@@ -105,7 +105,7 @@ func (s *Store) SaveItem(ctx context.Context, item *Item) error {
 // GetSessionItems retrieves all items for a session
 func (s *Store) GetSessionItems(ctx context.Context, sessionID uuid.UUID) ([]*Item, error) {
 	var items []*Item
-	result := s.db.WithContext(ctx).Where("session_id = ?", sessionID).Order("created_at").Find(&items)
+	result := s.db.WithContext(ctx).Where("session_id = ?", sessionID).Order("created_at ASC").Find(&items)
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to query items: %w", result.Error)

@@ -178,5 +178,9 @@ func sanitizeHTMLToDiscordMarkdown(content string) string {
 	// Clean up extra whitespace
 	result = strings.TrimSpace(result)
 
+	// Handle escape sequences for Discord markdown
+	result = strings.ReplaceAll(result, "\\n", `
+	`)
+
 	return result
 }

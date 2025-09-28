@@ -58,7 +58,7 @@ func (s *Session) GetLatestItems(ctx context.Context, n int) []Item {
 	return items
 }
 
-/** memory.Session interface methods **/
+/** External memory.Session interface methods **/
 
 // SessionID returns the session ID as a string
 func (s *Session) SessionID(ctx context.Context) string {
@@ -86,6 +86,20 @@ func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseIn
 	// Execute the query
 	if err := query.Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("failed to retrieve messages: %w", err)
+	}
+
+	// Reverse items to chronological order
+	// We perform a longer insertion sort just to be safe as created_at may not be unique from batch inserts
+	for i := 1; i < len(items); i++ {
+		key := items[i]
+		j := i - 1
+
+		// Items are sorted by CreatedAt ascending, and by ID ascending for tie-breakers
+		for j >= 0 && (items[j].CreatedAt.After(key.CreatedAt) || (items[j].CreatedAt.Equal(key.CreatedAt) && items[j].ID > key.ID)) {
+			items[j+1] = items[j]
+			j--
+		}
+		items[j+1] = key
 	}
 
 	// Convert Item models to TResponseInputItem
@@ -117,6 +131,7 @@ func (s *Session) AddItems(ctx context.Context, responseItems []memory.TResponse
 		items = append(items, &Item{
 			SessionID: s.ID,
 			Session:   s,
+			CreatedAt: time.Now().UTC(),
 			ResponseItem: ResponseItemData{
 				TResponseInputItem: &responseItem,
 			},
