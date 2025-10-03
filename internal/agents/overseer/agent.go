@@ -7,6 +7,7 @@ import (
 	communicationagent "github.com/ethanbaker/assistant/internal/agents/communication"
 	memoryagent "github.com/ethanbaker/assistant/internal/agents/memory"
 	searchagent "github.com/ethanbaker/assistant/internal/agents/search"
+	taskagent "github.com/ethanbaker/assistant/internal/agents/task"
 	"github.com/ethanbaker/assistant/internal/stores/memory"
 	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/utils"
@@ -39,6 +40,11 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, con
 		return nil, err
 	}
 
+	taskAgent, err := taskagent.NewTaskAgent(memoryStore, sessionStore, config)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create handoffs for each specialized agent
 	memoryHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
 		Agent:                   memoryAgent.Agent(),
@@ -56,6 +62,12 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, con
 		Agent:                   searchAgent.Agent(),
 		ToolNameOverride:        "handoff_to_search_agent",
 		ToolDescriptionOverride: "Hand off to the Search Agent for web searches, fetching URL content, finding current information, or researching topics on the internet",
+	})
+
+	taskHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
+		Agent:                   taskAgent.Agent(),
+		ToolNameOverride:        "handoff_to_task_agent",
+		ToolDescriptionOverride: "Hand off to the Task Agent for managing tasks, creating to-dos, updating task status, or organizing task lists. Only hand off when specifically mentioning actions that involve tasks or to-dos",
 	})
 
 	// Get sysprompt path
@@ -78,6 +90,7 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, con
 			memoryHandoff,
 			communicationHandoff,
 			searchHandoff,
+			taskHandoff,
 		)
 
 	oa := &OverseerAgent{
