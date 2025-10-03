@@ -4,9 +4,11 @@ package memory
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ethanbaker/assistant/internal/stores/memory"
 	"github.com/ethanbaker/assistant/internal/stores/session"
+	"github.com/ethanbaker/assistant/pkg/agent"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
@@ -17,6 +19,7 @@ type MemoryAgent struct {
 	config       *utils.Config
 	memoryStore  *memory.Store
 	sessionStore session.Store
+	basePrompt   string
 }
 
 // NewMemoryAgent creates a new memory agent
@@ -27,23 +30,22 @@ func NewMemoryAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 		return nil, errors.New("MEMORY_SYSPROMPT_PATH not set in environment")
 	}
 
+	ma := &MemoryAgent{
+		config:       config,
+		memoryStore:  memoryStore,
+		sessionStore: sessionStore,
+	}
+
 	// Load instructions from file with fallback to hardcoded version
-	instructions, err := utils.LoadPrompt(path)
+	var err error
+	ma.basePrompt, err = utils.LoadPrompt(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the underlying agent
-	agentInstance := agents.New("memory-agent").
-		WithInstructions(instructions).
+	ma.agent = agents.New("memory-agent").
 		WithModel(config.Get("MODEL"))
-
-	ma := &MemoryAgent{
-		agent:        agentInstance,
-		config:       config,
-		memoryStore:  memoryStore,
-		sessionStore: sessionStore,
-	}
 
 	// Register tools
 	ma.registerTools()
@@ -53,7 +55,13 @@ func NewMemoryAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 
 // Agent returns the underlying openai-agents-go instance
 func (ma *MemoryAgent) Agent() *agents.Agent {
-	return ma.agent
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(ma.basePrompt)
+	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Date: " + now.Format("2006-01-02"))
+
+	return ma.agent.WithInstructions(builder.Build())
 }
 
 // ID returns the agent identifier

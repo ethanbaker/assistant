@@ -207,7 +207,7 @@ func (s *MySqlSession) ClearSession(ctx context.Context) error {
 }
 
 // TableName specifies the database table name for GORM
-func (MySqlSession) TableName() string {
+func (*MySqlSession) TableName() string {
 	return "sessions"
 }
 

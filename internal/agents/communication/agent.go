@@ -3,9 +3,11 @@ package communication
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ethanbaker/assistant/internal/stores/memory"
 	"github.com/ethanbaker/assistant/internal/stores/session"
+	"github.com/ethanbaker/assistant/pkg/agent"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
@@ -16,6 +18,7 @@ type CommunicationAgent struct {
 	config       *utils.Config
 	memoryStore  *memory.Store
 	sessionStore session.Store
+	basePrompt   string
 }
 
 // NewCommunicationAgent creates a new communication agent
@@ -33,7 +36,8 @@ func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store
 	}
 
 	// Load instructions from file with fallback to hardcoded version
-	instructions, err := utils.LoadPrompt(path)
+	var err error
+	ca.basePrompt, err = utils.LoadPrompt(path)
 	if err != nil {
 		return nil, err
 	}
@@ -49,12 +53,9 @@ func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store
 	}
 
 	// Create the underlying agent
-	agentInstance := agents.New("communication-agent").
-		WithInstructions(instructions).
+	ca.agent = agents.New("communication-agent").
 		WithModel(config.Get("MODEL")).
 		WithMCPServers(mcpServers)
-
-	ca.agent = agentInstance
 
 	// Register tools
 	//ca.registerTools()
@@ -64,7 +65,13 @@ func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store
 
 // Agent returns the underlying openai-agents-go instance
 func (ca *CommunicationAgent) Agent() *agents.Agent {
-	return ca.agent
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(ca.basePrompt)
+	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Date: " + now.Format("2006-01-02"))
+
+	return ca.agent.WithInstructions(builder.Build())
 }
 
 // ID returns the agent identifier

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethanbaker/assistant/internal/stores/memory"
 	"github.com/ethanbaker/assistant/internal/stores/session"
+	"github.com/ethanbaker/assistant/pkg/agent"
 	"github.com/ethanbaker/assistant/pkg/utils"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
@@ -35,8 +36,10 @@ type SearchAgent struct {
 	config       *utils.Config
 	memoryStore  *memory.Store
 	sessionStore session.Store
-	searxngURL   string
-	httpClient   *http.Client
+	basePrompt   string
+
+	searxngURL string
+	httpClient *http.Client
 }
 
 // NewSearchAgent creates a new search agent
@@ -64,17 +67,15 @@ func NewSearchAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 	}
 
 	// Load instructions from file
-	instructions, err := utils.LoadPrompt(path)
+	var err error
+	sa.basePrompt, err = utils.LoadPrompt(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the underlying agent
-	agentInstance := agents.New("search-agent").
-		WithInstructions(instructions).
+	sa.agent = agents.New("search-agent").
 		WithModel(config.Get("MODEL"))
-
-	sa.agent = agentInstance
 
 	// Register tools
 	sa.registerTools()
@@ -84,7 +85,13 @@ func NewSearchAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 
 // Agent returns the underlying openai-agents-go instance
 func (sa *SearchAgent) Agent() *agents.Agent {
-	return sa.agent
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(sa.basePrompt)
+	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Date: " + now.Format("2006-01-02"))
+
+	return sa.agent.WithInstructions(builder.Build())
 }
 
 // ID returns the agent identifier
