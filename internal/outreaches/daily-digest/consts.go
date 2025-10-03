@@ -8,6 +8,9 @@ import (
 
 /* ---- CONSTANTS ---- */
 
+// Populated on init
+var NEWS_PROMPT string
+
 const RETRY_LIMIT = 10
 
 var NORMAL_TASKS = NotionDatabase{

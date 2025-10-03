@@ -18,11 +18,11 @@ type OverseerAgent struct {
 	agent        *agents.Agent
 	config       *utils.Config
 	memoryStore  *memory.Store
-	sessionStore *session.Store
+	sessionStore session.Store
 }
 
 // NewOverseerAgent creates a new overseer agent with handoffs to all specialized agents
-func NewOverseerAgent(memoryStore *memory.Store, sessionStore *session.Store, config *utils.Config) (*OverseerAgent, error) {
+func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*OverseerAgent, error) {
 	// Create specialized agents for handoffs
 	memoryAgent, err := memoryagent.NewMemoryAgent(memoryStore, sessionStore, config)
 	if err != nil {

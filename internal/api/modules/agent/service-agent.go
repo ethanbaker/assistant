@@ -19,7 +19,7 @@ import (
 // Orchestrator is a wrapper for managing the agent's memory and session stores
 type Orchestrator struct {
 	memory   *memory.Store
-	sessions *session.Store
+	sessions session.Store
 	overseer agent.CustomAgent
 }
 
@@ -43,7 +43,7 @@ func Init(cfg *utils.Config) {
 		log.Fatalf("[AGENT]: Failed to initialize memory store: %v", err)
 	}
 
-	sessionStore, err := session.NewStore(dbConfig.FormatDSN())
+	sessionStore, err := session.NewMySqlStore(dbConfig.FormatDSN())
 	if err != nil {
 		log.Fatalf("[AGENT]: Failed to initialize session store: %v", err)
 	}
@@ -71,12 +71,12 @@ func GetOrchestrator() *Orchestrator {
 }
 
 // Create a new session
-func (o *Orchestrator) NewSession(ctx context.Context, userID string) (*session.Session, error) {
+func (o *Orchestrator) NewSession(ctx context.Context, userID string) (session.Session, error) {
 	return o.sessions.CreateSession(ctx, userID)
 }
 
 // Find an existing session by UUID
-func (o *Orchestrator) FindSession(ctx context.Context, sessionID string) (*session.Session, error) {
+func (o *Orchestrator) FindSession(ctx context.Context, sessionID string) (session.Session, error) {
 	// Validate the session ID format
 	guid, err := uuid.Parse(sessionID)
 	if err != nil {
@@ -123,7 +123,7 @@ func (o *Orchestrator) AddMessage(ctx context.Context, sessionID string, req sdk
 }
 
 // Remove an existing session and return it
-func (o *Orchestrator) RemoveSession(ctx context.Context, sessionID string) (*session.Session, error) {
+func (o *Orchestrator) RemoveSession(ctx context.Context, sessionID string) (session.Session, error) {
 	// Parse session ID
 	guid, err := uuid.Parse(sessionID)
 	if err != nil {

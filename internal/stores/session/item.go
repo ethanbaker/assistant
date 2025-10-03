@@ -79,7 +79,6 @@ type Item struct {
 
 	// Session information
 	SessionID uuid.UUID `json:"session_id" gorm:"type:char(36);not null;index"`
-	Session   *Session  `json:"-" gorm:"foreignKey:SessionID;constraint:OnDelete:CASCADE"`
 }
 
 // NewItem creates a new item

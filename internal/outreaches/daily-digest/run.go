@@ -9,8 +9,11 @@ import (
 
 	ics "github.com/arran4/golang-ical"
 	notionapi "github.com/dstotijn/go-notion"
+	"github.com/ethanbaker/assistant/internal/agents/search"
+	"github.com/ethanbaker/assistant/internal/stores/session"
 	"github.com/ethanbaker/assistant/pkg/outreach"
 	"github.com/ethanbaker/assistant/pkg/utils"
+	"github.com/nlpodyssey/openai-agents-go/agents"
 	"github.com/teambition/rrule-go"
 )
 
@@ -42,7 +45,7 @@ func CreateDailyDigest(cfg *utils.Config) *outreach.TaskReturn {
 }
 
 // helper function to get the daily digest with associated errors
-func getDailyDigest(_ *utils.Config) (string, error) {
+func getDailyDigest(cfg *utils.Config) (string, error) {
 	var output string
 
 	var events []Event
@@ -99,6 +102,13 @@ func getDailyDigest(_ *utils.Config) (string, error) {
 		return "", err
 	}
 	output += recurringTasks
+
+	// Add news section
+	news, err := getNewsSection(cfg)
+	if err != nil {
+		return "", err
+	}
+	output += "\n" + news + "\n"
 
 	return output, nil
 }
@@ -407,7 +417,7 @@ func getCriticalTasks() (string, error) {
 		}
 
 		if project != "" {
-			project = "<EM>" + project + "</EM>"
+			project = "(<EM>" + project + "</EM>)"
 		}
 
 		// Get the date of the task
@@ -460,9 +470,50 @@ func getRecurringTasks() (string, error) {
 			}
 			name := nameField.Title[0].Text.Content
 
+			// Special formatting for connections
+			typeField := properties["Type"]
+			if typeField.Select != nil && typeField.Select.Name == "Connection" {
+				// Find the related person
+				connection := properties["Connection Label"]
+				if connection.Formula != nil && len(*connection.Formula.String) > 0 {
+					name = name + " with " + *connection.Formula.String
+				}
+			}
+
 			output += fmt.Sprintf("- %v\n", name)
 		}
 	}
 
 	return output, nil
+}
+
+// Helper method to get the news section
+func getNewsSection(cfg *utils.Config) (string, error) {
+	// Make an in-memory session for a one time call
+	store := session.NewInMemoryStore()
+	sess, err := store.CreateSession(context.Background(), "daily-digest-news")
+	if err != nil {
+		return "", fmt.Errorf("failed to create in-memory session: %v", err)
+	}
+
+	// Make a search agent
+	agent, err := search.NewSearchAgent(nil, store, cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to create search agent: %v", err)
+	}
+
+	// Make a runner with the in-memory session
+	runner := agents.Runner{
+		Config: agents.RunConfig{
+			Session: sess,
+		},
+	}
+
+	// Run the agent with a specialized news prompt
+	resp, err := runner.Run(context.Background(), agent.Agent(), NEWS_PROMPT)
+	if err != nil {
+		return "", fmt.Errorf("failed to run search agent: %v", err)
+	}
+
+	return fmt.Sprintf("<STRONG>In the News:</STRONG>\n%s", resp.FinalOutput), nil
 }

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -121,29 +122,28 @@ func DeleteSession(c *gin.Context) {
 	c.JSON(sdk.NewSuccessResponse("Session deleted successfully", sess).AsGinResponse())
 }
 
-// Helper method to reverse slices
-func reverse[T any](s []T) {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
-}
-
 // Helper method to convert internal session to sdk session
-func toSDKSession(session *session.Session) sdk.Session {
-	resp := sdk.Session{
-		ID:        session.ID.String(),
-		CreatedAt: session.CreatedAt,
-		UpdatedAt: session.UpdatedAt,
-		DeletedAt: session.DeletedAt,
-		UserID:    session.UserID,
+func toSDKSession(s session.Session) sdk.Session {
+	// Cast to concrete type to access fields
+	switch s := s.(type) {
+	case *session.MySqlSession:
+		resp := sdk.Session{
+			ID:        s.SessionID(context.Background()),
+			CreatedAt: s.CreatedAt,
+			UpdatedAt: s.UpdatedAt,
+			DeletedAt: s.DeletedAt,
+			UserID:    s.UserID,
+		}
+
+		for _, item := range s.Items {
+			dbItem := toSDKItem(*item)
+			resp.Items = append(resp.Items, &dbItem)
+		}
+		return resp
 	}
 
-	for _, item := range session.Items {
-		dbItem := toSDKItem(*item)
-		resp.Items = append(resp.Items, &dbItem)
-	}
-
-	return resp
+	// Unhandled type
+	return sdk.Session{}
 }
 
 // Helper method to convert internal item to sdk item

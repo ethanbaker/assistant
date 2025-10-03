@@ -16,11 +16,11 @@ type MemoryAgent struct {
 	agent        *agents.Agent
 	config       *utils.Config
 	memoryStore  *memory.Store
-	sessionStore *session.Store
+	sessionStore session.Store
 }
 
 // NewMemoryAgent creates a new memory agent
-func NewMemoryAgent(memoryStore *memory.Store, sessionStore *session.Store, config *utils.Config) (*MemoryAgent, error) {
+func NewMemoryAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*MemoryAgent, error) {
 	// Get sysprompt path
 	path := config.Get("MEMORY_SYSPROMPT_PATH")
 	if path == "" {

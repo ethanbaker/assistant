@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/ethanbaker/assistant/internal/stores/memory"
@@ -35,15 +34,15 @@ type SearchAgent struct {
 	agent        *agents.Agent
 	config       *utils.Config
 	memoryStore  *memory.Store
-	sessionStore *session.Store
+	sessionStore session.Store
 	searxngURL   string
 	httpClient   *http.Client
 }
 
 // NewSearchAgent creates a new search agent
-func NewSearchAgent(memoryStore *memory.Store, sessionStore *session.Store, config *utils.Config) (*SearchAgent, error) {
+func NewSearchAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*SearchAgent, error) {
 	// Get SearXNG URL from environment, default to localhost
-	searxngURL := os.Getenv("SEARXNG_URL")
+	searxngURL := config.Get("SEARXNG_URL")
 	if searxngURL == "" {
 		return nil, errors.New("SEARXNG_URL not set in environment")
 	}

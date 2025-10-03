@@ -17,12 +17,14 @@ curl -X GET http://localhost:8080/api/agent/sessions/419d669b-5324-451c-b8a4-5a2
 "
 
 # Add message to session
-curl -X POST http://localhost:8080/api/agent/sessions/fd70dbd5-7d46-41cd-9fb9-2deb2b7c79ba/message \
+: "
+curl -X POST http://localhost:8080/api/agent/sessions/d522067d-746d-4835-9a43-2d013116aa85/message \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: 2d78d012-29a7-4210-b427-3037e79dc33b" \
   -d '{
     "content": "Hello! How are you?"
   }'
+"
 
 # Delete session
 : "

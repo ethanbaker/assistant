@@ -15,11 +15,11 @@ type CommunicationAgent struct {
 	agent        *agents.Agent
 	config       *utils.Config
 	memoryStore  *memory.Store
-	sessionStore *session.Store
+	sessionStore session.Store
 }
 
 // NewCommunicationAgent creates a new communication agent
-func NewCommunicationAgent(memoryStore *memory.Store, sessionStore *session.Store, config *utils.Config) (*CommunicationAgent, error) {
+func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*CommunicationAgent, error) {
 	ca := &CommunicationAgent{
 		config:       config,
 		memoryStore:  memoryStore,

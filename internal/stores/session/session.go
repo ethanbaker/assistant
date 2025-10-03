@@ -11,8 +11,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// Session represents a conversation session
-type Session struct {
+// Sessions implement the memory.Session interface and other helpful methods
+type Session interface {
+	memory.Session
+
+	GetItemCount() int
+	GetLastItem() *Item
+	GetLatestItems(ctx context.Context, n int) []Item
+}
+
+// MySqlSession represents a conversation session
+type MySqlSession struct {
 	ID        uuid.UUID      `json:"id" gorm:"type:char(36);primaryKey;unique;not null"`
 	CreatedAt time.Time      `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt time.Time      `json:"updated_at" gorm:"column:updated_at"`
@@ -28,7 +37,7 @@ type Session struct {
 /** Message management methods **/
 
 // GetItemCount returns the number of items in the session
-func (s *Session) GetItemCount() int {
+func (s *MySqlSession) GetItemCount() int {
 	if s.Items == nil {
 		return 0
 	}
@@ -36,7 +45,7 @@ func (s *Session) GetItemCount() int {
 }
 
 // GetLastItem returns the last item in the session, or nil if no items exist
-func (s *Session) GetLastItem() *Item {
+func (s *MySqlSession) GetLastItem() *Item {
 	if len(s.Items) == 0 {
 		return nil
 	}
@@ -44,7 +53,7 @@ func (s *Session) GetLastItem() *Item {
 }
 
 // Get the latest n items from a session
-func (s *Session) GetLatestItems(ctx context.Context, n int) []Item {
+func (s *MySqlSession) GetLatestItems(ctx context.Context, n int) []Item {
 	var items []Item
 
 	if n <= 0 || n > len(s.Items) {
@@ -61,14 +70,14 @@ func (s *Session) GetLatestItems(ctx context.Context, n int) []Item {
 /** External memory.Session interface methods **/
 
 // SessionID returns the session ID as a string
-func (s *Session) SessionID(ctx context.Context) string {
+func (s *MySqlSession) SessionID(ctx context.Context) string {
 	return s.ID.String()
 }
 
 // GetItems retrieves the conversation history for this session as response input items
 // limit is the maximum number of items to retrieve. If <= 0, retrieves all items.
 // When specified, returns the latest N items in chronological order.
-func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseInputItem, error) {
+func (s *MySqlSession) GetItems(ctx context.Context, limit int) ([]memory.TResponseInputItem, error) {
 	// Make sure database connection is available
 	if s.db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -76,11 +85,11 @@ func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseIn
 
 	// Query messages associated with this session
 	var items []Item
-	query := s.db.WithContext(ctx).Where("session_id = ?", s.ID).Order("created_at DESC")
+	query := s.db.WithContext(ctx).Where("session_id = ?", s.ID).Order("created_at DESC").Order("id DESC")
 
 	if limit > 0 {
 		// Get the latest N messages in descending order first
-		query = s.db.WithContext(ctx).Where("session_id = ?", s.ID).Order("created_at DESC").Limit(limit)
+		query = s.db.WithContext(ctx).Where("session_id = ?", s.ID).Order("created_at DESC").Order("id DESC").Limit(limit)
 	}
 
 	// Execute the query
@@ -89,7 +98,7 @@ func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseIn
 	}
 
 	// Reverse items to chronological order
-	// We perform a longer insertion sort just to be safe as created_at may not be unique from batch inserts
+	// We perform a longer insertion sort just to be safe as
 	for i := 1; i < len(items); i++ {
 		key := items[i]
 		j := i - 1
@@ -114,7 +123,7 @@ func (s *Session) GetItems(ctx context.Context, limit int) ([]memory.TResponseIn
 }
 
 // AddItems adds new items to the conversation history
-func (s *Session) AddItems(ctx context.Context, responseItems []memory.TResponseInputItem) error {
+func (s *MySqlSession) AddItems(ctx context.Context, responseItems []memory.TResponseInputItem) error {
 	// Make sure database connection is available
 	if s.db == nil {
 		return fmt.Errorf("database connection not available")
@@ -130,7 +139,6 @@ func (s *Session) AddItems(ctx context.Context, responseItems []memory.TResponse
 	for _, responseItem := range responseItems {
 		items = append(items, &Item{
 			SessionID: s.ID,
-			Session:   s,
 			CreatedAt: time.Now().UTC(),
 			ResponseItem: ResponseItemData{
 				TResponseInputItem: &responseItem,
@@ -148,7 +156,7 @@ func (s *Session) AddItems(ctx context.Context, responseItems []memory.TResponse
 
 // PopItem removes and returns the most recent item from the session.
 // It returns nil if the session is empty.
-func (s *Session) PopItem(ctx context.Context) (*memory.TResponseInputItem, error) {
+func (s *MySqlSession) PopItem(ctx context.Context) (*memory.TResponseInputItem, error) {
 	// Make sure database connection is available
 	if s.db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -184,7 +192,7 @@ func (s *Session) PopItem(ctx context.Context) (*memory.TResponseInputItem, erro
 }
 
 // ClearSession clears all items for this session.
-func (s *Session) ClearSession(ctx context.Context) error {
+func (s *MySqlSession) ClearSession(ctx context.Context) error {
 	// Make sure database connection is available
 	if s.db == nil {
 		return fmt.Errorf("database connection not available")
@@ -198,7 +206,215 @@ func (s *Session) ClearSession(ctx context.Context) error {
 	return nil
 }
 
+// TableName specifies the database table name for GORM
+func (MySqlSession) TableName() string {
+	return "sessions"
+}
+
 // SetDB sets the database connection for the session (for dependency injection)
-func (s *Session) SetDB(db *gorm.DB) {
+func (s *MySqlSession) SetDB(db *gorm.DB) {
 	s.db = db
+}
+
+// InMemorySession represents a conversation session stored in memory
+type InMemorySession struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	UserID string  `json:"user_id"`
+	Items  []*Item `json:"items,omitempty"`
+
+	store *InMemoryStore `json:"-"` // reference to the store for database operations
+	mu    sync.RWMutex   `json:"-"` // mutex for thread-safe access
+}
+
+/** Message management methods **/
+
+// GetItemCount returns the number of items in the session
+func (s *InMemorySession) GetItemCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.Items == nil {
+		return 0
+	}
+	return len(s.Items)
+}
+
+// GetLastItem returns the last item in the session, or nil if no items exist
+func (s *InMemorySession) GetLastItem() *Item {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(s.Items) == 0 {
+		return nil
+	}
+	return s.Items[len(s.Items)-1]
+}
+
+// GetLatestItems gets the latest n items from a session
+func (s *InMemorySession) GetLatestItems(ctx context.Context, n int) []Item {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var items []Item
+
+	if n <= 0 || n > len(s.Items) {
+		return items
+	}
+
+	for i := range n {
+		items = append(items, *s.Items[len(s.Items)-1-i])
+	}
+
+	return items
+}
+
+/** External memory.Session interface methods **/
+
+// SessionID returns the session ID as a string
+func (s *InMemorySession) SessionID(ctx context.Context) string {
+	return s.ID.String()
+}
+
+// GetItems retrieves the conversation history for this session as response input items
+// limit is the maximum number of items to retrieve. If <= 0, retrieves all items.
+// When specified, returns the latest N items in chronological order.
+func (s *InMemorySession) GetItems(ctx context.Context, limit int) ([]memory.TResponseInputItem, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Get items from the store
+	items, err := s.store.GetSessionItems(ctx, s.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve items: %w", err)
+	}
+
+	// Sort items in descending order first if we need to limit
+	if limit > 0 && len(items) > limit {
+		// Get the latest N items
+		items = items[len(items)-limit:]
+	}
+
+	// Sort items chronologically (ascending by CreatedAt, then by ID)
+	for i := 1; i < len(items); i++ {
+		key := items[i]
+		j := i - 1
+
+		for j >= 0 && (items[j].CreatedAt.After(key.CreatedAt) || (items[j].CreatedAt.Equal(key.CreatedAt) && items[j].ID > key.ID)) {
+			items[j+1] = items[j]
+			j--
+		}
+		items[j+1] = key
+	}
+
+	// Convert Item models to TResponseInputItem
+	var responseItems []memory.TResponseInputItem
+	for _, item := range items {
+		if item.ResponseItem.TResponseInputItem != nil {
+			responseItems = append(responseItems, *item.ResponseItem.TResponseInputItem)
+		}
+	}
+
+	return responseItems, nil
+}
+
+// AddItems adds new items to the conversation history
+func (s *InMemorySession) AddItems(ctx context.Context, responseItems []memory.TResponseInputItem) error {
+	if s.store == nil {
+		return fmt.Errorf("store connection not available")
+	}
+
+	// If no response items provided, nothing to add
+	if len(responseItems) == 0 {
+		return nil
+	}
+
+	// Convert TResponseInputItem to Item models
+	for _, responseItem := range responseItems {
+		item := &Item{
+			SessionID: s.ID,
+			CreatedAt: time.Now().UTC(),
+			ResponseItem: ResponseItemData{
+				TResponseInputItem: &responseItem,
+			},
+		}
+
+		// Save item to store
+		if err := s.store.SaveItem(ctx, item); err != nil {
+			return fmt.Errorf("failed to save item: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// PopItem removes and returns the most recent item from the session.
+// It returns nil if the session is empty.
+func (s *InMemorySession) PopItem(ctx context.Context) (*memory.TResponseInputItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.store == nil {
+		return nil, fmt.Errorf("store connection not available")
+	}
+
+	// Get items from store
+	items, err := s.store.GetSessionItems(ctx, s.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve items: %w", err)
+	}
+
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	// Find the most recent item
+	var mostRecentItem *Item
+	for _, item := range items {
+		if mostRecentItem == nil || item.CreatedAt.After(mostRecentItem.CreatedAt) ||
+			(item.CreatedAt.Equal(mostRecentItem.CreatedAt) && item.ID > mostRecentItem.ID) {
+			mostRecentItem = item
+		}
+	}
+
+	if mostRecentItem == nil {
+		return nil, nil
+	}
+
+	// Remove the item from store's items
+	s.store.mu.Lock()
+	storeItems := s.store.items[s.ID]
+	// Find and remove the item
+	for i, item := range storeItems {
+		if item.ID == mostRecentItem.ID {
+			s.store.items[s.ID] = append(storeItems[:i], storeItems[i+1:]...)
+			break
+		}
+	}
+	// Also update the session's Items slice
+	s.Items = s.store.items[s.ID]
+	s.store.mu.Unlock()
+
+	// Return the TResponseInputItem
+	return mostRecentItem.ResponseItem.TResponseInputItem, nil
+}
+
+// ClearSession clears all items for this session.
+func (s *InMemorySession) ClearSession(ctx context.Context) error {
+	if s.store == nil {
+		return fmt.Errorf("store connection not available")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Clear items from store
+	s.store.mu.Lock()
+	s.store.items[s.ID] = []*Item{}
+	s.Items = []*Item{}
+	s.store.mu.Unlock()
+
+	return nil
 }

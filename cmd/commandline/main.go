@@ -20,7 +20,7 @@ import (
 // Orchestrator is a wrapper for managing the agent's memory and session stores
 type Orchestrator struct {
 	memory   *memory.Store
-	sessions *session.Store
+	sessions session.Store
 	overseer agent.CustomAgent
 }
 
@@ -52,7 +52,7 @@ func main() {
 		log.Fatalf("[COMMANDLINE]: Failed to initialize memory store: %v", err)
 	}
 
-	sessionStore, err := session.NewStore(dbConfig.FormatDSN())
+	sessionStore, err := session.NewMySqlStore(dbConfig.FormatDSN())
 	if err != nil {
 		log.Fatalf("[COMMANDLINE]: Failed to initialize session store: %v", err)
 	}
@@ -87,7 +87,7 @@ func startInteractiveSession(ctx context.Context) error {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
-	fmt.Printf("Session created: %s\n", sess.ID)
+	fmt.Printf("Session created: %s\n", sess.SessionID(ctx))
 
 	// Create scanner for reading user input
 	scanner := bufio.NewScanner(os.Stdin)
@@ -126,7 +126,7 @@ func startInteractiveSession(ctx context.Context) error {
 	return nil
 }
 
-func executeAgentCall(ctx context.Context, sess *session.Session, input string) (string, error) {
+func executeAgentCall(ctx context.Context, sess session.Session, input string) (string, error) {
 	// Initialize OpenAI agents runner with the persistent session
 	runner := agents.Runner{
 		Config: agents.RunConfig{

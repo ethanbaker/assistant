@@ -55,7 +55,7 @@ echo -e ""
 
 # Attach compose network
 echo -e "${YELLOW}Checking connection status of $CONTAINER_NAME to assistant-network...${NC}"
-if docker network inspect assistant-network | grep $CONTAINER_NAME; then
+if docker network inspect assistant-network | grep $CONTAINER_NAME > /dev/null; then
     echo -e "${GREEN}$CONTAINER_NAME is already connected to assistant-network${NC}"
 else
     echo -e "${YELLOW}$CONTAINER_NAME is not connected to assistant-network. Attempting to connect...${NC}"

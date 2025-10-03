@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 	_ "time/tzdata" // Embed timezone database
@@ -60,6 +61,18 @@ func Init(cfg *utils.Config) error {
 		return fmt.Errorf("NOTION_DATABASE_RECURRING_ID environment variable is not set")
 	}
 
+	// Read outreach prompt files
+	newsPromptPath := cfg.Get("OUTREACH_DAILY_DIGEST_NEWS_PROMPT")
+	if newsPromptPath == "" {
+		return fmt.Errorf("OUTREACH_DAILY_DIGEST_NEWS_PROMPT environment variable is not set")
+	}
+
+	data, err := os.ReadFile(newsPromptPath)
+	if err != nil {
+		return err
+	}
+	NEWS_PROMPT = string(data)
+
 	// Read in calendar config
 	calendarPath := cfg.Get("CALENDAR_CONFIG_FILE")
 	if calendarPath == "" {
@@ -98,6 +111,23 @@ func Init(cfg *utils.Config) error {
 	formatLoc, err = time.LoadLocation(config.TimezoneFormat)
 	if err != nil {
 		return err
+	}
+
+	// Warn if searxng is not running
+	searxngUrl := cfg.Get("SEARXNG_URL")
+	if searxngUrl == "" {
+		return fmt.Errorf("SEARXNG_URL environment variable is not set")
+	}
+
+	baseUrl, err := url.Parse(searxngUrl)
+	if err != nil {
+		return fmt.Errorf("failed to parse SEARXNG_URL: %v", err)
+	}
+
+	// Check health endpoint
+	_, err = http.Get(baseUrl.JoinPath("healthz").String())
+	if err != nil {
+		fmt.Printf("WARNING: could not connect to SearXNG at %s. News section will fail\n", cfg.Get("SEARXNG_URL"))
 	}
 
 	return nil
