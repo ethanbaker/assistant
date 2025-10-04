@@ -242,6 +242,70 @@ func TestHandleGetRecurringTasks(t *testing.T) {
 	}
 }
 
+func TestHandleGetTodaysTasks(t *testing.T) {
+	ta := getTaskAgent()
+	ctx := context.Background()
+
+	tests := []struct {
+		name      string
+		arguments string
+		wantError bool
+	}{
+		{
+			name:      "Empty arguments",
+			arguments: "",
+			wantError: false,
+		},
+		{
+			name:      "JSON arguments (ignored)",
+			arguments: `{"ignored": "value"}`,
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ta.handleGetTodaysTasks(ctx, tt.arguments)
+
+			if tt.wantError && err == nil {
+				t.Errorf("handleGetTodaysTasks() expected error for test %s but got none", tt.name)
+			}
+			if !tt.wantError && err != nil {
+				t.Errorf("handleGetTodaysTasks() unexpected error for test %s: %v", tt.name, err)
+			}
+
+			// Verify result structure when no error is expected
+			if !tt.wantError && err == nil {
+				// The function should return either a slice of tasks or a slice with a "No upcoming tasks found" message
+				if result == nil {
+					t.Errorf("handleGetTodaysTasks() returned nil result for test %s", tt.name)
+				}
+
+				// Check if result can be cast to []map[string]any
+				if tasks, ok := result.([]map[string]any); ok {
+					// If there are no tasks, should return a message
+					if len(tasks) == 1 {
+						if msg, exists := tasks[0]["message"]; exists {
+							if msgStr, isString := msg.(string); isString && msgStr == "No upcoming tasks found" {
+								// This is the expected "no tasks" response
+							} else {
+								t.Errorf("handleGetTodaysTasks() unexpected message format for test %s", tt.name)
+							}
+						}
+					}
+					// If len > 1, it means we have actual tasks, which is also valid
+				} else {
+					t.Errorf("handleGetTodaysTasks() returned unexpected result type for test %s", tt.name)
+				}
+			}
+
+			// Note: In actual implementation, you would mock the underlying
+			// queryTasks and queryRecurringTasks methods to return expected results
+			_ = result
+		})
+	}
+}
+
 func TestHandleCreateNewTask(t *testing.T) {
 	ta := getTaskAgent()
 	ctx := context.Background()

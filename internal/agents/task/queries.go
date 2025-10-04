@@ -57,7 +57,7 @@ func (ta *TaskAgent) buildFetchTasksQuery(args FetchTasksArgs) notionapi.Databas
 
 	// Filter by due date
 	if args.DueDate != nil && *args.DueDate != "" {
-		dueDate, err := time.Parse("2006-01-02", *args.DueDate)
+		dueDate, err := time.Parse(DATE_FORMAT, *args.DueDate)
 		if err == nil {
 			filters = append(filters, notionapi.DatabaseQueryFilter{
 				Property: COLUMN_DATE,

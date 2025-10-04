@@ -13,6 +13,7 @@ import (
 func (ta *TaskAgent) registerTools() {
 	ta.agent.WithTools(
 		ta.createFetchTasksTool(),
+		ta.createGetTodaysTaskTool(),
 		ta.createGetTaskDetailsTool(),
 		ta.createGetUpcomingTasksTool(),
 		ta.createGetRecurringTasksTool(),
@@ -98,6 +99,24 @@ func (ta *TaskAgent) createFetchTasksTool() agents.FunctionTool {
 		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
 			return ta.handleFetchTasks(ctx, arguments)
+		},
+		IsEnabled: agents.FunctionToolEnabled(),
+	}
+}
+
+// createGetTodaysTaskTool creates the get today's tasks tool
+func (ta *TaskAgent) createGetTodaysTaskTool() agents.FunctionTool {
+	return agents.FunctionTool{
+		Name:        "get_todays_tasks",
+		Description: "Get all tasks that are due today",
+		ParamsJSONSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{},
+			"additionalProperties": false,
+		},
+		StrictJSONSchema: param.NewOpt(true),
+		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
+			return ta.handleGetTodaysTasks(ctx, arguments)
 		},
 		IsEnabled: agents.FunctionToolEnabled(),
 	}
@@ -336,6 +355,38 @@ func (ta *TaskAgent) handleFetchTasks(ctx context.Context, arguments string) (an
 	return ta.queryTasks(ctx, query)
 }
 
+// handleGetTodaysTasks processes the get today's tasks tool invocation
+func (ta *TaskAgent) handleGetTodaysTasks(ctx context.Context, arguments string) (any, error) {
+	// Get upcoming tasks
+	upcomingTasksQuery := ta.buildUpcomingTasksQuery()
+	taskResp, err := ta.queryTasks(ctx, upcomingTasksQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get recurring tasks due today
+	recurringTasksQuery := ta.buildRecurringTasksQuery()
+	recurringResp, err := ta.queryRecurringTasks(ctx, recurringTasksQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	// Combine results
+	upcomingTasks, ok1 := taskResp.([]map[string]any)
+	recurringTasks, ok2 := recurringResp.([]map[string]any)
+	if !ok1 || !ok2 {
+		return nil, fmt.Errorf("unexpected response format")
+	}
+
+	combined := append(upcomingTasks, recurringTasks...)
+	if len(combined) == 0 {
+		return []map[string]any{
+			{"message": "No upcoming tasks found"},
+		}, nil
+	}
+	return combined, nil
+}
+
 // handleGetTaskDetails processes the get task details tool invocation
 func (ta *TaskAgent) handleGetTaskDetails(ctx context.Context, arguments string) (any, error) {
 	var args GetTaskDetailsArgs
@@ -352,8 +403,9 @@ func (ta *TaskAgent) handleGetTaskDetails(ctx context.Context, arguments string)
 
 // handleGetUpcomingTasks processes the get upcoming tasks tool invocation
 func (ta *TaskAgent) handleGetUpcomingTasks(ctx context.Context, arguments string) (any, error) {
-	query := ta.buildUpcomingTasksQuery()
-	return ta.queryTasks(ctx, query)
+	// Get upcoming tasks
+	upcomingTasksQuery := ta.buildUpcomingTasksQuery()
+	return ta.queryTasks(ctx, upcomingTasksQuery)
 }
 
 // handleGetRecurringTasks processes the get recurring tasks tool invocation

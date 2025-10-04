@@ -1,6 +1,7 @@
 package task
 
 import (
+	"strings"
 	"time"
 
 	notionapi "github.com/dstotijn/go-notion"
@@ -13,6 +14,14 @@ func pointer[T any](v T) *T {
 
 // Format Notion API responses into simplified structures
 func (ta *TaskAgent) formatTasksResponse(pages []notionapi.Page) []map[string]any {
+	// If no pages, return message
+	if len(pages) == 0 {
+		return []map[string]any{
+			{"message": "No tasks found"},
+		}
+	}
+
+	// Format each page into a simplified task structure
 	var tasks []map[string]any
 	for _, page := range pages {
 		tasks = append(tasks, ta.formatTask(&page))
@@ -53,7 +62,8 @@ func (ta *TaskAgent) formatTask(page *notionapi.Page) map[string]any {
 		}
 
 		if date, ok := props[COLUMN_DATE]; ok && date.Date != nil {
-			task["due_date"] = date.Date.Start.Format("2006-01-02")
+			task["due_date"] = date.Date.Start.Format(DATE_FORMAT)
+			task["due_date_pretty"] = date.Date.Start.Format(PRETTY_DATE_FORMAT)
 		}
 
 		if project, ok := props[COLUMN_PROJECT]; ok && project.Select != nil {
@@ -66,6 +76,14 @@ func (ta *TaskAgent) formatTask(page *notionapi.Page) map[string]any {
 
 // formatBlocks is a helper function that formats Notion blocks into simplified structures
 func (ta *TaskAgent) formatBlocks(blocks []notionapi.Block) []map[string]any {
+	// If no blocks, return empty message
+	if len(blocks) == 0 {
+		return []map[string]any{
+			{"message": "No content found"},
+		}
+	}
+
+	// Format each block
 	var content []map[string]any
 	for _, block := range blocks {
 		content = append(content, ta.formatBlock(&block))
@@ -83,6 +101,8 @@ func (ta *TaskAgent) formatBlock(block *notionapi.Block) map[string]any {
 func isValidPriority(priority *string) bool {
 	if priority == nil {
 		return true // Allow nil (no priority set)
+	} else if strings.TrimSpace(*priority) == "" {
+		return true // Allow empty string (no priority set)
 	}
 
 	validPriorities := map[string]bool{
@@ -98,6 +118,8 @@ func isValidPriority(priority *string) bool {
 func isValidEffort(effort *string) bool {
 	if effort == nil {
 		return true // Allow nil (no effort set)
+	} else if strings.TrimSpace(*effort) == "" {
+		return true // Allow empty string (no effort set)
 	}
 
 	validEfforts := map[string]bool{
@@ -112,8 +134,13 @@ func isValidEffort(effort *string) bool {
 func isValidDate(date *string) bool {
 	if date == nil {
 		return true // Allow nil (no date set)
+	} else if strings.TrimSpace(*date) == "" {
+		return true // Allow empty string (no date set)
 	}
 
-	_, err := time.Parse("2006-01-02", *date)
+	_, err := time.Parse(DATE_FORMAT, *date)
+	if err != nil {
+		_, err = time.Parse(PRETTY_DATE_FORMAT, *date)
+	}
 	return err == nil
 }

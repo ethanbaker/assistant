@@ -62,6 +62,7 @@ func NewManager(cfg *utils.Config, opts *ManagerOptions) (*Manager, error) {
 		cron:        cron.New(),
 		sunTicker:   time.NewTicker(1 * time.Minute),
 		opts:        opts,
+		cfg:         cfg,
 	}
 
 	// Start the manager

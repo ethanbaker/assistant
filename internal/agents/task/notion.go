@@ -37,6 +37,7 @@ func (ta *TaskAgent) queryTasks(ctx context.Context, query notionapi.DatabaseQue
 	return ta.formatTasksResponse(response.Results), nil
 }
 
+// queryRecurringTasks queries the recurring tasks database with provided filters
 func (ta *TaskAgent) queryRecurringTasks(ctx context.Context, query notionapi.DatabaseQuery) (any, error) {
 	if ta.ShouldDryRun(ctx) {
 		return map[string]any{
@@ -132,7 +133,7 @@ func (ta *TaskAgent) createTask(ctx context.Context, args CreateTaskArgs) (any, 
 	}
 
 	if args.DueDate != nil {
-		dueDate, err := time.Parse("2006-01-02", *args.DueDate)
+		dueDate, err := time.Parse(DATE_FORMAT, *args.DueDate)
 		if err == nil {
 			properties[COLUMN_DATE] = notionapi.DatabasePageProperty{
 				Date: &notionapi.Date{Start: notionapi.NewDateTime(dueDate, false)},
@@ -203,7 +204,7 @@ func (ta *TaskAgent) updateTask(ctx context.Context, args UpdateTaskArgs) (any, 
 	}
 
 	if args.DueDate != nil {
-		dueDate, err := time.Parse("2006-01-02", *args.DueDate)
+		dueDate, err := time.Parse(DATE_FORMAT, *args.DueDate)
 		if err == nil {
 			properties[COLUMN_DATE] = notionapi.DatabasePageProperty{
 				Date: &notionapi.Date{Start: notionapi.NewDateTime(dueDate, false)},
