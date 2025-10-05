@@ -6,6 +6,7 @@ import (
 
 	communicationagent "github.com/ethanbaker/assistant/internal/agents/communication"
 	memoryagent "github.com/ethanbaker/assistant/internal/agents/memory"
+	scheduleagent "github.com/ethanbaker/assistant/internal/agents/schedule"
 	searchagent "github.com/ethanbaker/assistant/internal/agents/search"
 	taskagent "github.com/ethanbaker/assistant/internal/agents/task"
 	"github.com/ethanbaker/assistant/internal/stores/memory"
@@ -45,6 +46,11 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, con
 		return nil, err
 	}
 
+	scheduleAgent, err := scheduleagent.NewScheduleAgent(memoryStore, sessionStore, config)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create handoffs for each specialized agent
 	memoryHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
 		Agent:                   memoryAgent.Agent(),
@@ -70,6 +76,12 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, con
 		ToolDescriptionOverride: "Hand off to the Task Agent for managing tasks, creating to-dos, updating task status, or organizing task lists. Only hand off when specifically mentioning actions that involve tasks or to-dos",
 	})
 
+	scheduleHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
+		Agent:                   scheduleAgent.Agent(),
+		ToolNameOverride:        "handoff_to_schedule_agent",
+		ToolDescriptionOverride: "Hand off to the Schedule Agent for managing calendar events, scheduling meetings, or retrieving calendar information. Only hand off when specifically mentioning actions that involve calendars or scheduling",
+	})
+
 	// Get sysprompt path
 	path := config.Get("OVERSEER_SYSPROMPT_PATH")
 	if path == "" {
@@ -91,6 +103,7 @@ func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, con
 			communicationHandoff,
 			searchHandoff,
 			taskHandoff,
+			scheduleHandoff,
 		)
 
 	oa := &OverseerAgent{

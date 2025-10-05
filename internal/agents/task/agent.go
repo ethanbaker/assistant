@@ -72,6 +72,13 @@ func (ta *TaskAgent) Agent() *agents.Agent {
 	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
 	builder.AddContext("Date: " + now.Format("2006-01-02"))
 
+	// Format the next week's dates
+	weekDates := "Next Week's Dates:\n"
+	for i := 0; i < 7; i++ {
+		day := now.AddDate(0, 0, i)
+		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
+	}
+
 	return ta.agent.WithInstructions(builder.Build())
 }
 

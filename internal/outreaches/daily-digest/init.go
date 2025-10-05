@@ -74,9 +74,9 @@ func Init(cfg *utils.Config) error {
 	NEWS_PROMPT = string(data)
 
 	// Read in calendar config
-	calendarPath := cfg.Get("CALENDAR_CONFIG_FILE")
+	calendarPath := cfg.Get("OUTREACH_CALENDAR_CONFIG_FILE")
 	if calendarPath == "" {
-		return fmt.Errorf("CALENDAR_CONFIG_FILE environment variable is not set")
+		return fmt.Errorf("OUTREACH_CALENDAR_CONFIG_FILE environment variable is not set")
 	}
 
 	yamlFile, err := os.ReadFile(calendarPath)
