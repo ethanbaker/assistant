@@ -29,6 +29,10 @@ func findProjectRoot() (string, error) {
 			break
 		}
 		currentDir = parentDir
+
+		if currentDir == "/" {
+			break
+		}
 	}
 
 	return "", fmt.Errorf("could not find project root (go.mod not found)")
