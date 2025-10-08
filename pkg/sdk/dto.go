@@ -165,11 +165,17 @@ type Item struct {
 
 /** Outreach Module DTOs */
 
+// OutreachCredentials represents credentials for outreach implementations
+type OutreachCredentials struct {
+	ClientId     string `json:"client_id" binding:"required"`     // Unique identifier for the implementation
+	ClientSecret string `json:"client_secret" binding:"required"` // Secret for signing requests
+}
+
 // OutreachRegisterRequest represents the request to register an implementation
 type OutreachRegisterRequest struct {
-	CallbackUrl  string `json:"callback_url" binding:"required"` // HTTP endpoint where outreach requests will be sent
-	ClientSecret string `json:"client_secret"`                   // Secret for signing requests (optional)
-	ClientId     string `json:"client_id" binding:"required"`    // Unique identifier for the implementation
+	CallbackUrl  string `json:"callback_url" binding:"required"`  // HTTP endpoint where outreach requests will be sent
+	ClientId     string `json:"client_id" binding:"required"`     // Unique identifier for the implementation
+	ClientSecret string `json:"client_secret" binding:"required"` // Secret for signing requests
 }
 
 // OutreachRegisterResponse represents the successful registration response

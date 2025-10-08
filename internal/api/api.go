@@ -42,10 +42,10 @@ func Start(cfg *utils.Config) {
 	// Adding custom modules
 	health_module.RegisterRoutes(baseGroup)
 
-	agent_module.RegisterRoutes(baseGroup)
+	agent_module.RegisterRoutes(baseGroup, cfg)
 	agent_module.Init(cfg)
 
-	outreach_module.RegisterRoutes(baseGroup)
+	outreach_module.RegisterRoutes(baseGroup, cfg)
 	if err := outreach_module.Init(cfg); err != nil {
 		log.Fatal("[API-MAIN]: Failed to initialize outreach module: ", err)
 	}

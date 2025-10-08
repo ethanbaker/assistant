@@ -13,7 +13,7 @@ func (c *Client) RegisterImplementation(ctx context.Context, req *OutreachRegist
 	path := "/api/outreach/implementations"
 
 	var out ApiResponse[OutreachRegisterResponse]
-	if err := c.doJSON(ctx, http.MethodPost, path, req, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodPost, path, req, &out).WithApiKey(c.apiKey).doJSON(); err != nil {
 		return nil, err
 	}
 
@@ -29,12 +29,12 @@ func (c *Client) RegisterImplementation(ctx context.Context, req *OutreachRegist
 }
 
 // UnregisterImplementation removes an outreach implementation
-func (c *Client) UnregisterImplementation(ctx context.Context, clientId string) error {
+func (c *Client) UnregisterImplementation(ctx context.Context, clientId string, creds OutreachCredentials) error {
 	path := "/api/outreach/implementations/"
 	req := &OutreachUnregisterRequest{ClientId: clientId}
 
 	var out ApiResponse[map[string]string]
-	if err := c.doJSON(ctx, http.MethodDelete, path, req, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodDelete, path, req, &out).WithClientCredentials(creds.ClientId, creds.ClientSecret).doJSON(); err != nil {
 		return err
 	}
 
@@ -50,11 +50,11 @@ func (c *Client) UnregisterImplementation(ctx context.Context, clientId string) 
 }
 
 // GetImplementations retrieves all registered implementations
-func (c *Client) GetImplementations(ctx context.Context) (*OutreachListImplementationsResponse, error) {
+func (c *Client) GetImplementations(ctx context.Context, creds OutreachCredentials) (*OutreachListImplementationsResponse, error) {
 	path := "/api/outreach/implementations"
 
 	var out ApiResponse[OutreachListImplementationsResponse]
-	if err := c.doJSON(ctx, http.MethodGet, path, nil, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodGet, path, nil, &out).WithClientCredentials(creds.ClientId, creds.ClientSecret).doJSON(); err != nil {
 		return nil, err
 	}
 
@@ -70,11 +70,11 @@ func (c *Client) GetImplementations(ctx context.Context) (*OutreachListImplement
 }
 
 // GetOutreachStatus retrieves the current status of the outreach service
-func (c *Client) GetOutreachStatus(ctx context.Context) (*OutreachStatusResponse, error) {
+func (c *Client) GetOutreachStatus(ctx context.Context, creds OutreachCredentials) (*OutreachStatusResponse, error) {
 	path := "/api/outreach/status"
 
 	var out ApiResponse[OutreachStatusResponse]
-	if err := c.doJSON(ctx, http.MethodGet, path, nil, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodGet, path, nil, &out).WithClientCredentials(creds.ClientId, creds.ClientSecret).doJSON(); err != nil {
 		return nil, err
 	}
 

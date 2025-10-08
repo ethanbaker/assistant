@@ -13,7 +13,7 @@ func (c *Client) CreateSession(ctx context.Context, req *CreateSessionRequest) (
 	path := "/api/agent/sessions"
 
 	var out ApiResponse[Session]
-	if err := c.doJSON(ctx, http.MethodPost, path, req, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodPost, path, req, &out).WithApiKey(c.apiKey).doJSON(); err != nil {
 		return nil, err
 	}
 
@@ -29,7 +29,7 @@ func (c *Client) GetSession(ctx context.Context, uuid string) (*Session, error) 
 	path := fmt.Sprintf("/api/agent/sessions/%s", uuid)
 
 	var out ApiResponse[Session]
-	if err := c.doJSON(ctx, http.MethodGet, path, nil, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodGet, path, nil, &out).WithApiKey(c.apiKey).doJSON(); err != nil {
 		return nil, err
 	}
 
@@ -50,7 +50,7 @@ func (c *Client) SendMessage(ctx context.Context, uuid string, msg *PostMessageR
 	path := fmt.Sprintf("/api/agent/sessions/%s/message", uuid)
 
 	var out ApiResponse[PostMessageResponse]
-	if err := c.doJSON(ctx, http.MethodPost, path, msg, &out); err != nil {
+	if err := c.NewRequest(ctx, http.MethodPost, path, msg, &out).WithApiKey(c.apiKey).doJSON(); err != nil {
 		return nil, err
 	}
 
@@ -61,5 +61,5 @@ func (c *Client) SendMessage(ctx context.Context, uuid string, msg *PostMessageR
 func (c *Client) DeleteSession(ctx context.Context, uuid string) error {
 	path := fmt.Sprintf("/api/agent/sessions/%s", uuid)
 
-	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
+	return c.NewRequest(ctx, http.MethodDelete, path, nil, nil).WithApiKey(c.apiKey).doJSON()
 }
