@@ -3,10 +3,12 @@
 *.exe~
 *.dll
 *.so
+*.o
+*.a
 *.dylib
 bin/
 
-# Test binary, built with `go test -c`
+# Test binary
 *.test
 
 # Code coverage profiles and other test artifacts
@@ -15,15 +17,39 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
 # Go workspace file
 go.work
 go.work.sum
 
-# env file
-.env
+# Go-specific files
+/bin/
 
-# Editor/IDE
-.vscode/
+# Dependency files
+vendor/
+
+# Configuration and environment files
+.env
+.env.local
+.env.*
+config.yaml
+config.json
+resources/config/
+
+# IDE/editor specific files
+*.vscode/
+*.idea/
+*.swp
+*.swo
+
+# Logs and debug files
+*.log
+*.test
+
+# Cache files
+.cache/
+cover.out
+resources/cache/
+
+# Debug bins
+*.dbg
+__debug*

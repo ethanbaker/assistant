@@ -21,11 +21,3 @@ type CustomAgent interface {
 	// ShouldDryRun determines if the agent should run tools with or without user interaction
 	ShouldDryRun(ctx context.Context) bool
 }
-
-// DynamicPromptAgent is an optional interface for agents that support dynamic prompts
-type DynamicPromptAgent interface {
-	CustomAgent
-
-	// DynamicPrompt generates a context-aware prompt based on session state
-	DynamicPrompt(session any) string
-}

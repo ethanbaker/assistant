@@ -93,52 +93,6 @@ func TestCustomAgent_Interface(t *testing.T) {
 	}
 }
 
-// Test DynamicPromptAgent interface implementation
-func TestDynamicPromptAgent_Interface(t *testing.T) {
-	agent := &mockDynamicPromptAgent{
-		mockAgent: mockAgent{
-			id:     "dynamic-agent",
-			config: utils.NewConfig(map[string]string{}),
-			dryRun: false,
-		},
-		promptTemplate: "Base prompt",
-	}
-
-	// Test that it implements CustomAgent
-	var customAgent CustomAgent = agent
-	assert.Equal(t, "dynamic-agent", customAgent.ID())
-
-	// Test dynamic prompt functionality
-	sessionData := map[string]string{"user": "test"}
-	prompt := agent.DynamicPrompt(sessionData)
-	expected := "Base prompt with session data"
-	assert.Equal(t, expected, prompt)
-}
-
-// Test that DynamicPromptAgent can be used as CustomAgent
-func TestAgent_InterfaceComposition(t *testing.T) {
-	// Test that DynamicPromptAgent properly embeds CustomAgent
-	dynamicAgent := &mockDynamicPromptAgent{
-		mockAgent: mockAgent{
-			id:     "composed-agent",
-			config: utils.NewConfig(map[string]string{"test": "value"}),
-			dryRun: true,
-		},
-		promptTemplate: "Dynamic template",
-	}
-
-	// Should be able to use as CustomAgent
-	var agent CustomAgent = dynamicAgent
-
-	assert.Equal(t, "composed-agent", agent.ID())
-
-	ctx := context.Background()
-	assert.True(t, agent.ShouldDryRun(ctx))
-
-	config := agent.Config()
-	assert.Equal(t, "value", config.Get("test"))
-}
-
 // Test that agents handle context properly
 func TestAgent_ContextBehavior(t *testing.T) {
 	agent := &mockAgent{

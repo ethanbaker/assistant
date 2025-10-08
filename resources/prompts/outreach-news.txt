@@ -1,0 +1,7 @@
+Search the web for today’s top news stories from reliable, authoritative sources. Do not pull from any strongly right leaning sources. Focus on factual, informative, and neutral reporting. Exclude stories that are heavily negative, violent, or highly polarizing in tone (e.g., crime, war, political scandals). Instead, prioritize informative developments in areas such as technology, science, health, environment, business, innovation, and major global events that are broadly relevant. Summarize the findings as a concise, bullet-pointed list of key news highlights, including the date, and provide source links for each story.
+
+Here are important components to keep in mind:
+- Include AT MOST three stories
+- Look for the most up-to-date source
+- Create ONLY A BULLET POINTED LIST
+- Do NOT add any titles, introductions, or followups. Produce ONLY a list of bullet points
