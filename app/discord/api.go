@@ -54,7 +54,15 @@ func (b *Bot) unregisterOutreach() error {
 		return fmt.Errorf("OUTREACH_CLIENT_ID not set in environment")
 	}
 
-	return b.api.UnregisterImplementation(context.Background(), clientID)
+	clientSecret := b.config.Get("OUTREACH_CLIENT_SECRET")
+	if clientSecret == "" {
+		return fmt.Errorf("OUTREACH_CLIENT_SECRET not set in environment")
+	}
+
+	return b.api.UnregisterImplementation(context.Background(), clientID, sdk.OutreachCredentials{
+		ClientId:     clientID,
+		ClientSecret: clientSecret,
+	})
 }
 
 // startAPI starts the Discord API server
