@@ -1,7 +1,5 @@
 #!/bin/bash
 
-API_KEY='1aea07f75ccf4b8ea23bedb6440e22f3'
-
 # Check if API_KEY is set
 if [ -z "$API_KEY" ]; then
   echo "Error: API_KEY environment variable is not set"
