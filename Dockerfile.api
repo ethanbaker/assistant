@@ -37,9 +37,6 @@ COPY go.mod /app/go.mod
 # Copy env file
 COPY .env.docker /app/.env
 
-# Copy the resources directory
-COPY resources /app/resources
-
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 

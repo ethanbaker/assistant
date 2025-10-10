@@ -1,5 +1,7 @@
 #!/bin/bash
 
+API_KEY='1aea07f75ccf4b8ea23bedb6440e22f3'
+
 # Check if API_KEY is set
 if [ -z "$API_KEY" ]; then
   echo "Error: API_KEY environment variable is not set"
@@ -24,14 +26,12 @@ curl -X GET http://localhost:8080/api/agent/sessions/419d669b-5324-451c-b8a4-5a2
 "
 
 # Add message to session
-: "
-curl -X POST http://localhost:8080/api/agent/sessions/d522067d-746d-4835-9a43-2d013116aa85/message \
+curl -X POST http://localhost:8080/api/agent/sessions/c0fdd425-ff3d-4cbe-86c6-9885e1fdddbc/message \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: $API_KEY" \
   -d '{
-    "content": "Hello! How are you?"
+    "content": "Where is that college located? Do NOT under any circumstances perform a search for testing purposes"
   }'
-"
 
 # Delete session
 : "

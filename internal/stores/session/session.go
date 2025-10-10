@@ -3,11 +3,13 @@ package session
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nlpodyssey/openai-agents-go/memory"
+	"github.com/openai/openai-go/v2/shared/constant"
 	"gorm.io/gorm"
 )
 
@@ -116,6 +118,23 @@ func (s *MySqlSession) GetItems(ctx context.Context, limit int) ([]memory.TRespo
 	for _, item := range items {
 		if item.ResponseItem.TResponseInputItem != nil {
 			responseItems = append(responseItems, *item.ResponseItem.TResponseInputItem)
+		}
+	}
+
+	// Function calls and call outputs must appear together. So, if the limit ended with a function call output, truncate it
+	safeStart := false
+	for !safeStart && len(responseItems) > 0 {
+		switch *responseItems[0].GetType() {
+		case string(constant.ValueOf[constant.FunctionCallOutput]()):
+			responseItems = slices.Delete(responseItems, 0, 1)
+		case string(constant.ValueOf[constant.ComputerCallOutput]()):
+			responseItems = slices.Delete(responseItems, 0, 1)
+		case string(constant.ValueOf[constant.LocalShellCallOutput]()):
+			responseItems = slices.Delete(responseItems, 0, 1)
+		case string(constant.ValueOf[constant.CustomToolCallOutput]()):
+			responseItems = slices.Delete(responseItems, 0, 1)
+		default:
+			safeStart = true
 		}
 	}
 

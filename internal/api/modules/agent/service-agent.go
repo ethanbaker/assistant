@@ -105,10 +105,13 @@ func (o *Orchestrator) AddMessage(ctx context.Context, sessionID string, req sdk
 		ctx = context.WithValue(ctx, "data", req.Data)
 	}
 
+	limit := o.overseer.Config().GetIntWithDefault("CONTEXT_LIMIT", 10)
+
 	// Initialize OpenAI agents runner
 	runner := agents.Runner{
 		Config: agents.RunConfig{
-			Session: sess,
+			Session:     sess,
+			LimitMemory: limit,
 		},
 	}
 

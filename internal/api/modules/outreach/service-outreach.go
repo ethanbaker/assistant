@@ -197,9 +197,10 @@ func (s *OutreachService) loadTasksFromConfig(path string) error {
 		}
 	}
 
-	// Load tasks
+	// Allow empty tasks
 	if len(config.Tasks) == 0 {
-		return fmt.Errorf("no tasks found in configuration file")
+		log.Println("[OUTREACH]: No tasks found in configuration, skipping task loading")
+		return nil
 	}
 
 	if err := s.manager.LoadTasks(config.Tasks); err != nil {
