@@ -21,6 +21,33 @@ const (
 	AI_CONTEXT_MAX_EVENTS    = 20
 )
 
+// tokenSavingSource wraps an oauth2.TokenSource and automatically saves
+// refreshed tokens to disk
+type tokenSavingSource struct {
+	source    oauth2.TokenSource
+	tokenPath string
+	lastToken *oauth2.Token
+}
+
+// Token returns a valid token, refreshing if necessary and saving to disk
+func (t *tokenSavingSource) Token() (*oauth2.Token, error) {
+	token, err := t.source.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	// If this is a new token (different access token), save it
+	if t.lastToken == nil || t.lastToken.AccessToken != token.AccessToken {
+		if saveErr := saveToken(t.tokenPath, token); saveErr != nil {
+			// Log the error but don't fail the request
+			fmt.Fprintf(os.Stderr, "Warning: failed to save refreshed token: %v\n", saveErr)
+		}
+		t.lastToken = token
+	}
+
+	return token, nil
+}
+
 // CalendarConfig represents the structure of the calendar configuration file
 type CalendarConfig struct {
 	Calendars []struct {
@@ -35,6 +62,8 @@ type CalendarService struct {
 	service        *calendar.Service
 	cfg            *utils.Config
 	calendarConfig CalendarConfig
+	tokenSource    oauth2.TokenSource
+	tokenPath      string
 }
 
 // NewCalendarService creates a new CalendarService instance
@@ -74,8 +103,31 @@ func NewCalendarService(ctx context.Context, cfg *utils.Config) (*CalendarServic
 		return nil, fmt.Errorf("failed to parse credentials: %w", err)
 	}
 
-	// Create OAuth2 calendar client
-	client := config.Client(ctx, &token)
+	// Create a token source that automatically refreshes the token
+	tokenSource := config.TokenSource(ctx, &token)
+	
+	// Wrap the token source to save tokens when they're refreshed
+	savingTokenSource := &tokenSavingSource{
+		source:    tokenSource,
+		tokenPath: tokenPath,
+	}
+	
+	// Get a fresh token (this will refresh if needed)
+	freshToken, err := savingTokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+
+	// If the token was refreshed, save it back to the file
+	if freshToken.AccessToken != token.AccessToken {
+		err = saveToken(tokenPath, freshToken)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
+		}
+	}
+
+	// Create OAuth2 calendar client with the token source
+	client := oauth2.NewClient(ctx, savingTokenSource)
 	service, err := calendar.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create calendar service: %w", err)
@@ -102,6 +154,8 @@ func NewCalendarService(ctx context.Context, cfg *utils.Config) (*CalendarServic
 		service:        service,
 		cfg:            cfg,
 		calendarConfig: calConfig,
+		tokenSource:    savingTokenSource,
+		tokenPath:      tokenPath,
 	}, nil
 }
 
@@ -381,4 +435,17 @@ func (cs *CalendarService) getCalendarID(calendarName string) string {
 		}
 	}
 	return ""
+}
+
+// saveToken saves the OAuth2 token to a file
+func saveToken(path string, token *oauth2.Token) error {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("unable to save token: %w", err)
+	}
+	defer f.Close()
+	
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(token)
 }
