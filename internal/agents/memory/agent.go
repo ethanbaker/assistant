@@ -45,7 +45,8 @@ func NewMemoryAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 
 	// Create the underlying agent
 	ma.agent = agents.New("memory-agent").
-		WithModel(config.Get("MODEL"))
+		WithModel(config.Get("MODEL")).
+		WithInstructionsFunc(ma.getPrompt)
 
 	// Register tools
 	ma.registerTools()
@@ -55,13 +56,7 @@ func NewMemoryAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 
 // Agent returns the underlying openai-agents-go instance
 func (ma *MemoryAgent) Agent() *agents.Agent {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(ma.basePrompt)
-	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Date: " + now.Format("2006-01-02"))
-
-	return ma.agent.WithInstructions(builder.Build())
+	return ma.agent
 }
 
 // ID returns the agent identifier
@@ -77,4 +72,15 @@ func (ma *MemoryAgent) Config() *utils.Config {
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (ma *MemoryAgent) ShouldDryRun(ctx context.Context) bool {
 	return ma.config.GetBool("DRY_RUN")
+}
+
+// getPrompt returns the prompt for the agent
+func (ma *MemoryAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(ma.basePrompt)
+	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Today's date: " + now.Format("2006-01-02"))
+
+	return builder.Build(), nil
 }

@@ -75,7 +75,8 @@ func NewSearchAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 
 	// Create the underlying agent
 	sa.agent = agents.New("search-agent").
-		WithModel(config.Get("MODEL"))
+		WithModel(config.Get("MODEL")).
+		WithInstructionsFunc(sa.getPrompt)
 
 	// Register tools
 	sa.registerTools()
@@ -85,13 +86,7 @@ func NewSearchAgent(memoryStore *memory.Store, sessionStore session.Store, confi
 
 // Agent returns the underlying openai-agents-go instance
 func (sa *SearchAgent) Agent() *agents.Agent {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(sa.basePrompt)
-	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Date: " + now.Format("2006-01-02"))
-
-	return sa.agent.WithInstructions(builder.Build())
+	return sa.agent
 }
 
 // ID returns the agent identifier
@@ -107,4 +102,15 @@ func (sa *SearchAgent) Config() *utils.Config {
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (sa *SearchAgent) ShouldDryRun(ctx context.Context) bool {
 	return sa.config.GetBool("DRY_RUN")
+}
+
+// getPrompt returns the prompt for the agent
+func (sa *SearchAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(sa.basePrompt)
+	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Today's date: " + now.Format("2006-01-02"))
+
+	return builder.Build(), nil
 }

@@ -65,7 +65,8 @@ func NewScheduleAgent(memoryStore *memory.Store, sessionStore session.Store, con
 
 	// Create the underlying agent
 	sa.agent = agents.New("schedule-agent").
-		WithModel(config.Get("MODEL"))
+		WithModel(config.Get("MODEL")).
+		WithInstructionsFunc(sa.getPrompt)
 
 	// Register tools
 	sa.registerTools()
@@ -75,28 +76,7 @@ func NewScheduleAgent(memoryStore *memory.Store, sessionStore session.Store, con
 
 // Agent returns the underlying openai-agents-go instance
 func (sa *ScheduleAgent) Agent() *agents.Agent {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(sa.basePrompt)
-	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Date: " + now.Format("2006-01-02"))
-
-	// Format the next week's dates
-	weekDates := "Next Week's Dates:\n"
-	for i := range 7 {
-		day := now.AddDate(0, 0, i)
-		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
-	}
-	builder.AddContext(weekDates)
-
-	// Add user specific calendars
-	calendars := "Calendars:\n"
-	for _, cal := range sa.calendarService.calendarConfig.Calendars {
-		calendars += fmt.Sprintf("  - **%s**: %s\n", cal.Name, cal.Description)
-	}
-	builder.AddContext(calendars)
-
-	return sa.agent.WithInstructions(builder.Build())
+	return sa.agent
 }
 
 // ID returns the agent identifier
@@ -112,4 +92,30 @@ func (sa *ScheduleAgent) Config() *utils.Config {
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (sa *ScheduleAgent) ShouldDryRun(ctx context.Context) bool {
 	return sa.config.GetBool("DRY_RUN")
+}
+
+// getPrompt returns the prompt for the agent
+func (sa *ScheduleAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(sa.basePrompt)
+	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Today's date: " + now.Format("2006-01-02"))
+
+	// Format the next week's dates
+	weekDates := "Following Week:\n"
+	for i := range 7 {
+		day := now.AddDate(0, 0, i)
+		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
+	}
+	builder.AddContext(weekDates)
+
+	// Add user specific calendars
+	calendars := "Calendars:\n"
+	for _, cal := range sa.calendarService.calendarConfig.Calendars {
+		calendars += fmt.Sprintf("  - **%s**: %s\n", cal.Name, cal.Description)
+	}
+	builder.AddContext(calendars)
+
+	return builder.Build(), nil
 }
