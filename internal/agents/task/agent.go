@@ -100,8 +100,8 @@ func (ta *TaskAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, er
 
 	// Format the next week's dates
 	weekDates := "Following Week:\n"
-	for i := 1; i < 8; i++ {
-		day := now.AddDate(0, 0, i)
+	for i := range 7 {
+		day := now.AddDate(0, 0, i+1)
 		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
 	}
 	builder.AddContext(weekDates)
