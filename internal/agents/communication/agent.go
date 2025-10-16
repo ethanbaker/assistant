@@ -55,7 +55,8 @@ func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store
 	// Create the underlying agent
 	ca.agent = agents.New("communication-agent").
 		WithModel(config.Get("MODEL")).
-		WithMCPServers(mcpServers)
+		WithMCPServers(mcpServers).
+		WithInstructionsFunc(ca.getPrompt)
 
 	// Register tools
 	//ca.registerTools()
@@ -65,13 +66,7 @@ func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store
 
 // Agent returns the underlying openai-agents-go instance
 func (ca *CommunicationAgent) Agent() *agents.Agent {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(ca.basePrompt)
-	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Date: " + now.Format("2006-01-02"))
-
-	return ca.agent.WithInstructions(builder.Build())
+	return ca.agent
 }
 
 // ID returns the agent identifier
@@ -87,4 +82,15 @@ func (ca *CommunicationAgent) Config() *utils.Config {
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (ca *CommunicationAgent) ShouldDryRun(ctx context.Context) bool {
 	return ca.config.GetBool("DRY_RUN")
+}
+
+// getPrompt returns the prompt for the agent
+func (ca *CommunicationAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(ca.basePrompt)
+	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Today's date: " + now.Format("Monday, 2006-01-02"))
+
+	return builder.Build(), nil
 }

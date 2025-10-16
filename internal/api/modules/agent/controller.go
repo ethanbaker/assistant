@@ -58,6 +58,13 @@ func PostMessage(c *gin.Context) {
 
 	orchestrator := GetOrchestrator()
 
+	// Validate session exists
+	_, err := orchestrator.FindSession(c.Request.Context(), uuid)
+	if err != nil {
+		c.JSON(sdk.NewErrorResponse(http.StatusBadRequest, "Session not found", err).AsGinResponse())
+		return
+	}
+
 	// Record current item count
 	count, err := orchestrator.GetItemCountBySessionID(c.Request.Context(), uuid)
 	if err != nil {

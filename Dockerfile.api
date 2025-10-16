@@ -34,11 +34,9 @@ WORKDIR /app
 # Copy go.mod for absolute path references
 COPY go.mod /app/go.mod
 
-# Copy env file
-COPY .env.docker /app/.env
-
-# Copy the resources directory
+# Copy resources and env
 COPY resources /app/resources
+COPY .env.docker /app/.env
 
 # Copy the binary from builder stage
 COPY --from=builder /app/main .

@@ -56,7 +56,8 @@ func NewTaskAgent(memoryStore *memory.Store, sessionStore session.Store, config 
 
 	// Create the underlying agent
 	ta.agent = agents.New("task-agent").
-		WithModel(config.Get("MODEL"))
+		WithModel(config.Get("MODEL")).
+		WithInstructionsFunc(ta.getPrompt)
 
 	// Register tools
 	ta.registerTools()
@@ -66,20 +67,7 @@ func NewTaskAgent(memoryStore *memory.Store, sessionStore session.Store, config 
 
 // Agent returns the underlying openai-agents-go instance
 func (ta *TaskAgent) Agent() *agents.Agent {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(ta.basePrompt)
-	builder.AddContext("Time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Date: " + now.Format("2006-01-02"))
-
-	// Format the next week's dates
-	weekDates := "Next Week's Dates:\n"
-	for i := 0; i < 7; i++ {
-		day := now.AddDate(0, 0, i)
-		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
-	}
-
-	return ta.agent.WithInstructions(builder.Build())
+	return ta.agent
 }
 
 // ID returns the agent identifier
@@ -100,4 +88,23 @@ func (ta *TaskAgent) ShouldDryRun(ctx context.Context) bool {
 // getNotionClient returns the Notion client instance
 func (ta *TaskAgent) getNotionClient() *notionapi.Client {
 	return ta.notionClient
+}
+
+// getPrompt returns the prompt for the agent
+func (ta *TaskAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
+	now := time.Now()
+
+	builder := agent.NewPromptBuilder(ta.basePrompt)
+	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
+	builder.AddContext("Today's date: " + now.Format("2006-01-02"))
+
+	// Format the next week's dates
+	weekDates := "Following Week:\n"
+	for i := range 7 {
+		day := now.AddDate(0, 0, i+1)
+		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
+	}
+	builder.AddContext(weekDates)
+
+	return builder.Build(), nil
 }
