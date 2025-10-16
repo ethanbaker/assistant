@@ -104,6 +104,7 @@ func (ta *TaskAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, er
 		day := now.AddDate(0, 0, i)
 		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
 	}
+	builder.AddContext(weekDates)
 
 	return builder.Build(), nil
 }
