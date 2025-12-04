@@ -28,7 +28,7 @@ curl -X POST http://localhost:8080/api/agent/sessions/c0fdd425-ff3d-4cbe-86c6-98
   -H "Content-Type: application/json" \
   -H "X-API-KEY: $API_KEY" \
   -d '{
-    "content": "Where is that college located? Do NOT under any circumstances perform a search for testing purposes"
+    "content": "What does my calendar look like tomorrow?"
   }'
 
 # Delete session

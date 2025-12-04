@@ -165,12 +165,47 @@ func (s *MySqlSession) AddItems(ctx context.Context, responseItems []memory.TRes
 		})
 	}
 
-	// Save items to database
-	if err := s.db.WithContext(ctx).Create(&items).Error; err != nil {
-		return fmt.Errorf("failed to save items: %w", err)
+	// Make sure tool calls and their outputs are stored in sequence
+	for i := 1; i < len(items); i++ {
+		prevItemId, prevIsToolCall := getToolCallIdFromInput(items[i-1].ResponseItem)
+		currItemId, currIsToolCallOutput := getToolCallIdFromOutput(items[i].ResponseItem)
+
+		// We don't care about current comparison if previous item is not a tool call or if it is a tool call in valid sequence
+		if !prevIsToolCall || (currIsToolCallOutput && prevItemId == currItemId) {
+			continue
+		}
+
+		// Make sure the corresponding tool call output is next
+		matchIndex := -1
+		for j := i + 1; j < len(items); j++ {
+			nextItemId, nextIsToolCallOutput := getToolCallIdFromOutput(items[j].ResponseItem)
+			if nextIsToolCallOutput && nextItemId == prevItemId {
+				matchIndex = j
+				break
+			}
+		}
+
+		if matchIndex != -1 {
+			// We found a matching tool call output, reorder the items
+			items[i], items[matchIndex] = items[matchIndex], items[i]
+		}
+
 	}
 
-	return nil
+	// Save items to database one-by-one to persist ordering
+	tx := s.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	for _, item := range items {
+		if err := tx.Create(&item).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }
 
 // PopItem removes and returns the most recent item from the session.
@@ -436,4 +471,38 @@ func (s *InMemorySession) ClearSession(ctx context.Context) error {
 	s.store.mu.Unlock()
 
 	return nil
+}
+
+// Helper function to get tool call id from tool call input
+func getToolCallIdFromInput(embeddedItem ResponseItemData) (string, bool) {
+	item := embeddedItem.TResponseInputItem
+
+	switch *item.GetType() {
+	case string(constant.ValueOf[constant.FunctionCall]()):
+		return item.OfFunctionCall.CallID, true
+	case string(constant.ValueOf[constant.LocalShellCall]()):
+		return item.OfLocalShellCall.CallID, true
+	case string(constant.ValueOf[constant.CustomToolCall]()):
+		return item.OfCustomToolCall.CallID, true
+	default:
+		return "", false
+	}
+}
+
+// Helper function to get tool call id from tool call output
+func getToolCallIdFromOutput(embeddedItem ResponseItemData) (string, bool) {
+	item := embeddedItem.TResponseInputItem
+
+	switch *item.GetType() {
+	case string(constant.ValueOf[constant.FunctionCallOutput]()):
+		return item.OfFunctionCallOutput.CallID, true
+	case string(constant.ValueOf[constant.ComputerCallOutput]()):
+		return item.OfComputerCallOutput.CallID, true
+	case string(constant.ValueOf[constant.LocalShellCallOutput]()):
+		return item.OfLocalShellCallOutput.ID, true
+	case string(constant.ValueOf[constant.CustomToolCallOutput]()):
+		return item.OfCustomToolCallOutput.CallID, true
+	default:
+		return "", false
+	}
 }
