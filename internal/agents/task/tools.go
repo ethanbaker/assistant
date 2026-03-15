@@ -4,10 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	notion_service "github.com/ethanbaker/assistant/internal/services/notion"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 	"github.com/openai/openai-go/v2/packages/param"
 )
+
+type GetTaskDetailsArgs struct {
+	TaskID string `json:"task_id"`
+}
+
+type CompleteTaskArgs struct {
+	TaskID string `json:"task_id"`
+}
 
 // registerTools registers all task management tools
 func (ta *TaskAgent) registerTools() {
@@ -21,43 +31,8 @@ func (ta *TaskAgent) registerTools() {
 		ta.createUpdateTaskTool(),
 		ta.createCompleteTaskTool(),
 		ta.createHighlightBlockersTool(),
-		ta.createSuggestFocusAreasToolF(),
+		ta.createSuggestFocusAreasTool(),
 	)
-}
-
-/** ---- TOOL ARGUMENT STRUCTURES ---- **/
-
-type FetchTasksArgs struct {
-	Complete *bool   `json:"complete,omitempty"`
-	Priority *string `json:"priority,omitempty"`
-	Effort   *string `json:"effort,omitempty"`
-	DueDate  *string `json:"due_date,omitempty"` // ISO format date
-	Project  *string `json:"project,omitempty"`
-}
-
-type GetTaskDetailsArgs struct {
-	TaskID string `json:"task_id"`
-}
-
-type CreateTaskArgs struct {
-	Title    string  `json:"title"`
-	Priority *string `json:"priority,omitempty"`
-	Effort   *string `json:"effort,omitempty"`
-	DueDate  *string `json:"due_date,omitempty"` // ISO format date
-	Project  *string `json:"project,omitempty"`
-}
-
-type UpdateTaskArgs struct {
-	TaskID   string  `json:"task_id"`
-	Title    *string `json:"title,omitempty"`
-	Priority *string `json:"priority,omitempty"`
-	Effort   *string `json:"effort,omitempty"`
-	DueDate  *string `json:"due_date,omitempty"` // ISO format date
-	Project  *string `json:"project,omitempty"`
-}
-
-type CompleteTaskArgs struct {
-	TaskID string `json:"task_id"`
 }
 
 /** ---- TOOL CREATORS ---- **/
@@ -77,12 +52,12 @@ func (ta *TaskAgent) createFetchTasksTool() agents.FunctionTool {
 				"priority": map[string]any{
 					"type":        "string",
 					"description": "Filter by priority level (optional)",
-					"enum":        []string{PRIORITY_LOW, PRIORITY_MEDIUM, PRIORITY_HIGH, PRIORITY_CRITICAL},
+					"enum":        []string{notion_service.PRIORITY_LOW, notion_service.PRIORITY_MEDIUM, notion_service.PRIORITY_HIGH, notion_service.PRIORITY_CRITICAL},
 				},
 				"effort": map[string]any{
 					"type":        "string",
 					"description": "Filter by effort level (optional)",
-					"enum":        []string{EFFORT_LOW, EFFORT_MEDIUM, EFFORT_HIGH},
+					"enum":        []string{notion_service.EFFORT_LOW, notion_service.EFFORT_MEDIUM, notion_service.EFFORT_HIGH},
 				},
 				"due_date": map[string]any{
 					"type":        "string",
@@ -94,7 +69,6 @@ func (ta *TaskAgent) createFetchTasksTool() agents.FunctionTool {
 				},
 			},
 			"additionalProperties": false,
-			"required":             []string{"complete", "priority", "effort", "due_date", "project"},
 		},
 		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
@@ -197,12 +171,12 @@ func (ta *TaskAgent) createNewTaskTool() agents.FunctionTool {
 				"priority": map[string]any{
 					"type":        "string",
 					"description": "Priority level for the task (optional)",
-					"enum":        []string{PRIORITY_LOW, PRIORITY_MEDIUM, PRIORITY_HIGH, PRIORITY_CRITICAL},
+					"enum":        []string{notion_service.PRIORITY_LOW, notion_service.PRIORITY_MEDIUM, notion_service.PRIORITY_HIGH, notion_service.PRIORITY_CRITICAL},
 				},
 				"effort": map[string]any{
 					"type":        "string",
 					"description": "Effort level for the task (optional)",
-					"enum":        []string{EFFORT_LOW, EFFORT_MEDIUM, EFFORT_HIGH},
+					"enum":        []string{notion_service.EFFORT_LOW, notion_service.EFFORT_MEDIUM, notion_service.EFFORT_HIGH},
 				},
 				"due_date": map[string]any{
 					"type":        "string",
@@ -214,7 +188,7 @@ func (ta *TaskAgent) createNewTaskTool() agents.FunctionTool {
 				},
 			},
 			"additionalProperties": false,
-			"required":             []string{"title", "priority", "effort", "due_date", "project"},
+			"required":             []string{"title"},
 		},
 		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
@@ -243,12 +217,12 @@ func (ta *TaskAgent) createUpdateTaskTool() agents.FunctionTool {
 				"priority": map[string]any{
 					"type":        "string",
 					"description": "Priority level for the task (optional)",
-					"enum":        []string{PRIORITY_LOW, PRIORITY_MEDIUM, PRIORITY_HIGH, PRIORITY_CRITICAL},
+					"enum":        []string{notion_service.PRIORITY_LOW, notion_service.PRIORITY_MEDIUM, notion_service.PRIORITY_HIGH, notion_service.PRIORITY_CRITICAL},
 				},
 				"effort": map[string]any{
 					"type":        "string",
 					"description": "Effort level for the task (optional)",
-					"enum":        []string{EFFORT_LOW, EFFORT_MEDIUM, EFFORT_HIGH},
+					"enum":        []string{notion_service.EFFORT_LOW, notion_service.EFFORT_MEDIUM, notion_service.EFFORT_HIGH},
 				},
 				"due_date": map[string]any{
 					"type":        "string",
@@ -260,7 +234,7 @@ func (ta *TaskAgent) createUpdateTaskTool() agents.FunctionTool {
 				},
 			},
 			"additionalProperties": false,
-			"required":             []string{"task_id", "title", "priority", "effort", "due_date", "project"},
+			"required":             []string{"task_id"},
 		},
 		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
@@ -312,8 +286,8 @@ func (ta *TaskAgent) createHighlightBlockersTool() agents.FunctionTool {
 	}
 }
 
-// createSuggestFocusAreasToolF creates the suggest focus areas tool
-func (ta *TaskAgent) createSuggestFocusAreasToolF() agents.FunctionTool {
+// createSuggestFocusAreasTool creates the suggest focus areas tool
+func (ta *TaskAgent) createSuggestFocusAreasTool() agents.FunctionTool {
 	return agents.FunctionTool{
 		Name:        "suggest_focus_areas",
 		Description: "Recommend what to work on next based on deadlines, priority, and effort",
@@ -334,61 +308,52 @@ func (ta *TaskAgent) createSuggestFocusAreasToolF() agents.FunctionTool {
 
 // handleFetchTasks processes the fetch tasks tool invocation
 func (ta *TaskAgent) handleFetchTasks(ctx context.Context, arguments string) (any, error) {
-	var args FetchTasksArgs
+	arguments = normalizeArguments(arguments)
+
+	var args notion_service.FetchTasksArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
-	if !isValidPriority(args.Priority) {
-		return nil, fmt.Errorf("invalid priority value: %s", *args.Priority)
+	if !notion_service.IsValidPriority(args.Priority) {
+		return nil, fmt.Errorf("invalid priority value: %s", valueOrEmpty(args.Priority))
 	}
 
-	if !isValidEffort(args.Effort) {
-		return nil, fmt.Errorf("invalid effort value: %s", *args.Effort)
+	if !notion_service.IsValidEffort(args.Effort) {
+		return nil, fmt.Errorf("invalid effort value: %s", valueOrEmpty(args.Effort))
 	}
 
-	if !isValidDate(args.DueDate) {
-		return nil, fmt.Errorf("invalid due_date format: %s", *args.DueDate)
+	if !notion_service.IsValidDate(args.DueDate) {
+		return nil, fmt.Errorf("invalid due_date format: %s", valueOrEmpty(args.DueDate))
 	}
 
-	query := ta.buildFetchTasksQuery(args)
-	return ta.queryTasks(ctx, query)
+	tasks, err := ta.taskService.QueryTasks(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	return formatTasksResponse(tasks), nil
 }
 
 // handleGetTodaysTasks processes the get today's tasks tool invocation
 func (ta *TaskAgent) handleGetTodaysTasks(ctx context.Context, arguments string) (any, error) {
-	// Get upcoming tasks
-	upcomingTasksQuery := ta.buildUpcomingTasksQuery()
-	taskResp, err := ta.queryTasks(ctx, upcomingTasksQuery)
+	upcomingTasks, err := ta.taskService.QueryUpcomingTasks(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get recurring tasks due today
-	recurringTasksQuery := ta.buildRecurringTasksQuery()
-	recurringResp, err := ta.queryRecurringTasks(ctx, recurringTasksQuery)
+	recurringTasks, err := ta.taskService.QueryRecurringTasks(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	// Combine results
-	upcomingTasks, ok1 := taskResp.([]map[string]any)
-	recurringTasks, ok2 := recurringResp.([]map[string]any)
-	if !ok1 || !ok2 {
-		return nil, fmt.Errorf("unexpected response format")
 	}
 
 	combined := append(upcomingTasks, recurringTasks...)
-	if len(combined) == 0 {
-		return []map[string]any{
-			{"message": "No upcoming tasks found"},
-		}, nil
-	}
-	return combined, nil
+	return formatTasksResponse(combined), nil
 }
 
 // handleGetTaskDetails processes the get task details tool invocation
 func (ta *TaskAgent) handleGetTaskDetails(ctx context.Context, arguments string) (any, error) {
+	arguments = normalizeArguments(arguments)
+
 	var args GetTaskDetailsArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
@@ -398,25 +363,36 @@ func (ta *TaskAgent) handleGetTaskDetails(ctx context.Context, arguments string)
 		return nil, fmt.Errorf("task_id is required")
 	}
 
-	return ta.getTaskDetails(ctx, args.TaskID)
+	details, err := ta.taskService.GetTaskDetails(ctx, args.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"task": details.Task, "content": details.Content}, nil
 }
 
 // handleGetUpcomingTasks processes the get upcoming tasks tool invocation
 func (ta *TaskAgent) handleGetUpcomingTasks(ctx context.Context, arguments string) (any, error) {
-	// Get upcoming tasks
-	upcomingTasksQuery := ta.buildUpcomingTasksQuery()
-	return ta.queryTasks(ctx, upcomingTasksQuery)
+	tasks, err := ta.taskService.QueryUpcomingTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return formatTasksResponse(tasks), nil
 }
 
 // handleGetRecurringTasks processes the get recurring tasks tool invocation
 func (ta *TaskAgent) handleGetRecurringTasks(ctx context.Context, arguments string) (any, error) {
-	query := ta.buildRecurringTasksQuery()
-	return ta.queryRecurringTasks(ctx, query)
+	tasks, err := ta.taskService.QueryRecurringTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return formatTasksResponse(tasks), nil
 }
 
 // handleCreateNewTask processes the create new task tool invocation
 func (ta *TaskAgent) handleCreateNewTask(ctx context.Context, arguments string) (any, error) {
-	var args CreateTaskArgs
+	arguments = normalizeArguments(arguments)
+
+	var args notion_service.CreateTaskArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
@@ -425,24 +401,30 @@ func (ta *TaskAgent) handleCreateNewTask(ctx context.Context, arguments string) 
 		return nil, fmt.Errorf("title is required")
 	}
 
-	if !isValidPriority(args.Priority) {
-		return nil, fmt.Errorf("invalid priority value: %s", *args.Priority)
+	if !notion_service.IsValidPriority(args.Priority) {
+		return nil, fmt.Errorf("invalid priority value: %s", valueOrEmpty(args.Priority))
 	}
 
-	if !isValidEffort(args.Effort) {
-		return nil, fmt.Errorf("invalid effort value: %s", *args.Effort)
+	if !notion_service.IsValidEffort(args.Effort) {
+		return nil, fmt.Errorf("invalid effort value: %s", valueOrEmpty(args.Effort))
 	}
 
-	if !isValidDate(args.DueDate) {
-		return nil, fmt.Errorf("invalid due_date format: %s", *args.DueDate)
+	if !notion_service.IsValidDate(args.DueDate) {
+		return nil, fmt.Errorf("invalid due_date format: %s", valueOrEmpty(args.DueDate))
 	}
 
-	return ta.createTask(ctx, args)
+	task, err := ta.taskService.CreateTask(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"message": "Task created successfully", "task": task}, nil
 }
 
 // handleUpdateTask processes the update task tool invocation
 func (ta *TaskAgent) handleUpdateTask(ctx context.Context, arguments string) (any, error) {
-	var args UpdateTaskArgs
+	arguments = normalizeArguments(arguments)
+
+	var args notion_service.UpdateTaskArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
@@ -451,27 +433,29 @@ func (ta *TaskAgent) handleUpdateTask(ctx context.Context, arguments string) (an
 		return nil, fmt.Errorf("task_id is required")
 	}
 
-	if args.Title == nil || *args.Title == "" {
-		return nil, fmt.Errorf("title is required")
+	if !notion_service.IsValidPriority(args.Priority) {
+		return nil, fmt.Errorf("invalid priority value: %s", valueOrEmpty(args.Priority))
 	}
 
-	if !isValidPriority(args.Priority) {
-		return nil, fmt.Errorf("invalid priority value: %s", *args.Priority)
+	if !notion_service.IsValidEffort(args.Effort) {
+		return nil, fmt.Errorf("invalid effort value: %s", valueOrEmpty(args.Effort))
 	}
 
-	if !isValidEffort(args.Effort) {
-		return nil, fmt.Errorf("invalid effort value: %s", *args.Effort)
+	if !notion_service.IsValidDate(args.DueDate) {
+		return nil, fmt.Errorf("invalid due_date format: %s", valueOrEmpty(args.DueDate))
 	}
 
-	if !isValidDate(args.DueDate) {
-		return nil, fmt.Errorf("invalid due_date format: %s", *args.DueDate)
+	task, err := ta.taskService.UpdateTask(ctx, args)
+	if err != nil {
+		return nil, err
 	}
-
-	return ta.updateTask(ctx, args)
+	return map[string]any{"message": "Task updated successfully", "task": task}, nil
 }
 
 // handleCompleteTask processes the complete task tool invocation
 func (ta *TaskAgent) handleCompleteTask(ctx context.Context, arguments string) (any, error) {
+	arguments = normalizeArguments(arguments)
+
 	var args CompleteTaskArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
@@ -481,15 +465,64 @@ func (ta *TaskAgent) handleCompleteTask(ctx context.Context, arguments string) (
 		return nil, fmt.Errorf("task_id is required")
 	}
 
-	return ta.completeTask(ctx, args.TaskID)
+	task, err := ta.taskService.CompleteTask(ctx, args.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"message": "Task completed successfully", "task": task}, nil
 }
 
 // handleHighlightBlockers processes the highlight blockers tool invocation
 func (ta *TaskAgent) handleHighlightBlockers(ctx context.Context, arguments string) (any, error) {
-	return ta.highlightBlockers(ctx)
+	result, err := ta.taskService.HighlightBlockers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"overdue_tasks":  result.OverdueTasks,
+		"critical_tasks": result.CriticalTasks,
+		"message":        "Identified potential blockers: overdue and critical priority tasks",
+	}, nil
 }
 
 // handleSuggestFocusAreas processes the suggest focus areas tool invocation
 func (ta *TaskAgent) handleSuggestFocusAreas(ctx context.Context, arguments string) (any, error) {
-	return ta.suggestFocusAreas(ctx)
+	result, err := ta.taskService.SuggestFocusAreas(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"urgent_tasks": result.UrgentTasks,
+		"quick_wins":   result.QuickWins,
+		"message":      "Focus areas: urgent high-priority tasks and quick wins for momentum",
+	}, nil
+}
+
+func normalizeArguments(arguments string) string {
+	if strings.TrimSpace(arguments) == "" {
+		return "{}"
+	}
+
+	return arguments
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
+}
+
+// formatTasksResponse formats a slice of tasks for tool response; adds message when empty
+func formatTasksResponse(tasks []notion_service.Task) map[string]any {
+	out := map[string]any{"tasks": tasks}
+	if len(tasks) == 0 {
+		out["message"] = "No tasks found"
+	}
+	return out
+}
+
+func pointer[T any](value T) *T {
+	return &value
 }

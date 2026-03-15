@@ -3,115 +3,72 @@ package overseer
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 
-	communicationagent "github.com/ethanbaker/assistant/internal/agents/communication"
-	memoryagent "github.com/ethanbaker/assistant/internal/agents/memory"
-	scheduleagent "github.com/ethanbaker/assistant/internal/agents/schedule"
-	searchagent "github.com/ethanbaker/assistant/internal/agents/search"
-	taskagent "github.com/ethanbaker/assistant/internal/agents/task"
-	"github.com/ethanbaker/assistant/internal/stores/memory"
-	"github.com/ethanbaker/assistant/internal/stores/session"
-	"github.com/ethanbaker/assistant/pkg/utils"
+	"github.com/ethanbaker/assistant/internal/config"
+	"github.com/ethanbaker/assistant/internal/domain"
+	"github.com/ethanbaker/assistant/internal/prompts"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
 
+// OverseerAgentConfig provided on construct
+type OverseerAgentConfig struct {
+	Model      string
+	PromptFile string
+	Handoffs   []domain.Handoff
+}
+
 // OverseerAgent coordinates and hands off to specialized agents
 type OverseerAgent struct {
-	agent        *agents.Agent
-	config       *utils.Config
-	memoryStore  *memory.Store
-	sessionStore session.Store
+	agent      *agents.Agent
+	basePrompt string
 }
 
 // NewOverseerAgent creates a new overseer agent with handoffs to all specialized agents
-func NewOverseerAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*OverseerAgent, error) {
-	// Create specialized agents for handoffs
-	memoryAgent, err := memoryagent.NewMemoryAgent(memoryStore, sessionStore, config)
+func NewOverseerAgent(cfg OverseerAgentConfig) (*OverseerAgent, error) {
+	if cfg.Model == "" {
+		return nil, errors.New("Model is required")
+	}
+	if cfg.PromptFile == "" {
+		return nil, errors.New("PromptFile is required")
+	}
+	if len(cfg.Handoffs) == 0 {
+		return nil, errors.New("Handoffs are required")
+	}
+
+	oa := &OverseerAgent{}
+
+	data, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
 		return nil, err
 	}
+	oa.basePrompt = string(data)
 
-	communicationAgent, err := communicationagent.NewCommunicationAgent(memoryStore, sessionStore, config)
-	if err != nil {
-		return nil, err
-	}
+	handoffs := make([]agents.Handoff, 0, len(cfg.Handoffs))
+	for i, handoff := range cfg.Handoffs {
+		if handoff.ToolName == "" {
+			return nil, fmt.Errorf("Handoffs[%d].ToolName is required", i)
+		}
+		if handoff.ToolDescription == "" {
+			return nil, fmt.Errorf("Handoffs[%d].ToolDescription is required", i)
+		}
+		if handoff.Agent == nil {
+			return nil, fmt.Errorf("Handoffs[%d].Agent is required", i)
+		}
 
-	searchAgent, err := searchagent.NewSearchAgent(memoryStore, sessionStore, config)
-	if err != nil {
-		return nil, err
-	}
-
-	taskAgent, err := taskagent.NewTaskAgent(memoryStore, sessionStore, config)
-	if err != nil {
-		return nil, err
-	}
-
-	scheduleAgent, err := scheduleagent.NewScheduleAgent(memoryStore, sessionStore, config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create handoffs for each specialized agent
-	memoryHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
-		Agent:                   memoryAgent.Agent(),
-		ToolNameOverride:        "handoff_to_memory_agent",
-		ToolDescriptionOverride: "Hand off to the Memory Agent for storing facts, recalling information, or searching past conversations",
-	})
-
-	communicationHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
-		Agent:                   communicationAgent.Agent(),
-		ToolNameOverride:        "handoff_to_communication_agent",
-		ToolDescriptionOverride: "Hand off to the Communication Agent for sending messages, summarizing content from Telegram or Discord, or managing communication workflows",
-	})
-
-	searchHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
-		Agent:                   searchAgent.Agent(),
-		ToolNameOverride:        "handoff_to_search_agent",
-		ToolDescriptionOverride: "Hand off to the Search Agent for web searches, fetching URL content, finding current information, or researching topics on the internet",
-	})
-
-	taskHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
-		Agent:                   taskAgent.Agent(),
-		ToolNameOverride:        "handoff_to_task_agent",
-		ToolDescriptionOverride: "Hand off to the Task Agent for managing tasks, creating to-dos, updating task status, or organizing task lists. Only hand off when specifically mentioning actions that involve tasks or to-dos",
-	})
-
-	scheduleHandoff := agents.HandoffFromAgent(agents.HandoffFromAgentParams{
-		Agent:                   scheduleAgent.Agent(),
-		ToolNameOverride:        "handoff_to_schedule_agent",
-		ToolDescriptionOverride: "Hand off to the Schedule Agent for managing calendar events, scheduling meetings, or retrieving calendar information. Only hand off when specifically mentioning actions that involve calendars or scheduling",
-	})
-
-	// Get sysprompt path
-	path := config.Get("OVERSEER_SYSPROMPT_PATH")
-	if path == "" {
-		return nil, errors.New("OVERSEER_SYSPROMPT_PATH not set in environment")
-	}
-
-	// Load instructions from file with fallback to hardcoded version
-	instructions, err := utils.LoadPrompt(path)
-	if err != nil {
-		return nil, err
+		handoffs = append(handoffs, agents.HandoffFromAgent(agents.HandoffFromAgentParams{
+			Agent:                   handoff.Agent.Agent(),
+			ToolNameOverride:        handoff.ToolName,
+			ToolDescriptionOverride: handoff.ToolDescription,
+		}))
 	}
 
 	// Create the overseer agent with handoffs
-	agentInstance := agents.New("overseer-agent").
-		WithInstructions(instructions).
-		WithModel(config.Get("MODEL")).
-		WithHandoffs(
-			memoryHandoff,
-			communicationHandoff,
-			searchHandoff,
-			taskHandoff,
-			scheduleHandoff,
-		)
-
-	oa := &OverseerAgent{
-		agent:        agentInstance,
-		config:       config,
-		memoryStore:  memoryStore,
-		sessionStore: sessionStore,
-	}
+	oa.agent = agents.New("overseer-agent").
+		WithModel(cfg.Model).
+		WithInstructionsFunc(oa.getPrompt).
+		WithHandoffs(handoffs...)
 
 	return oa, nil
 }
@@ -126,12 +83,13 @@ func (oa *OverseerAgent) ID() string {
 	return "overseer-agent"
 }
 
-// Config returns the agent configuration
-func (oa *OverseerAgent) Config() *utils.Config {
-	return oa.config
-}
-
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (oa *OverseerAgent) ShouldDryRun(ctx context.Context) bool {
-	return oa.config.GetBool("DRY_RUN")
+	return config.GetenvValue("DRY_RUN") == "true"
+}
+
+// getPrompt returns the prompt for the agent
+func (oa *OverseerAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
+	builder := prompts.NewPromptBuilder(oa.basePrompt)
+	return builder.Build(), nil
 }

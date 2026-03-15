@@ -4,58 +4,122 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ethanbaker/api/pkg/api_types"
 	"github.com/google/uuid"
 	"github.com/nlpodyssey/openai-agents-go/memory"
 	"gorm.io/gorm"
 )
 
-// ApiResponse represents a standard API response structure
-type ApiResponse[T any] struct {
-	Status  api_types.StatusType `json:"status"`          // Status message
-	Code    int                  `json:"code"`            // Status code
-	Message string               `json:"message"`         // Human-readable message
-	Data    T                    `json:"data,omitempty"`  // Optional data field for successful responses
-	Error   any                  `json:"error,omitempty"` // Optional errors field for error responses
+/** Generic Responses */
+
+// Generic success response
+type SuccessResponse[T any] struct {
+	Code int
+	Data T
 }
 
-// AsGinResponse converts the ApiResponse to a format suitable for Gin framework
-func (r ApiResponse[T]) AsGinResponse() (int, any) {
-	return r.Code, r
+// Return the ErrorResponse in a format to provide to Gin Context
+func (r SuccessResponse[T]) AsGinResponse() (int, any) {
+	return r.Code, r.Data
 }
 
-// AsJSON converts the ApiResponse to a format suitable for JSON responses
-func (r ApiResponse[T]) AsJSON() (string, error) {
-	b, err := json.Marshal(r)
-	if err != nil {
-		return "", err
+// Error response
+type ErrorResponse struct {
+	Error ErrorBody `json:"error"`
+}
+
+type ErrorBody struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Details []any  `json:"details,omitempty"`
+}
+
+// Return the ErrorResponse as a marshalable JSON object
+func (r ErrorResponse) AsJson() ([]byte, error) {
+	return json.Marshal(r)
+}
+
+// Return the ErrorResponse in a format to provide to Gin Context
+func (r ErrorResponse) AsGinResponse() (int, any) {
+	return r.Error.Code, r
+}
+
+// WithDetails adds additional details to the error response.
+func (e *ErrorResponse) WithDetails(details ...any) *ErrorResponse {
+	e.Error.Details = append(e.Error.Details, details...)
+	return e
+}
+
+// NewSuccess creates a new success response with custom data
+func NewSuccess[T any](data T) *SuccessResponse[T] {
+	return &SuccessResponse[T]{
+		Code: 200,
+		Data: data,
 	}
-	return string(b), nil
 }
 
-func NewSuccess(message string) ApiResponse[any] {
-	return ApiResponse[any]{
-		Status:  api_types.StatusSuccess,
-		Code:    200,
-		Message: message,
+// NewSuccessMessage creates a new success response with a success message
+func NewSuccessMessage(message string) *SuccessResponse[map[string]any] {
+	return &SuccessResponse[map[string]any]{
+		Code: 200,
+		Data: map[string]any{
+			"message": message,
+		},
 	}
 }
 
-func NewSuccessResponse[T any](message string, data T) ApiResponse[T] {
-	return ApiResponse[T]{
-		Status:  api_types.StatusSuccess,
-		Code:    200,
-		Message: message,
-		Data:    data,
+// NewErrorResponse creates a new custom error response
+func NewErrorResponse(code int, status, message string) *ErrorResponse {
+	return &ErrorResponse{
+		Error: ErrorBody{
+			Code:    code,
+			Status:  status,
+			Message: message,
+		},
 	}
 }
 
-func NewErrorResponse(code int, message string, err any) ApiResponse[any] {
-	return ApiResponse[any]{
-		Status:  api_types.StatusError,
-		Code:    code,
-		Message: message,
-		Error:   err,
+// NewBadRequest creates a new BAD_REQUEST (400) error response with a custom message
+func NewBadRequest(message string) *ErrorResponse {
+	return &ErrorResponse{
+		Error: ErrorBody{
+			Code:    400,
+			Status:  "BAD_REQUEST",
+			Message: message,
+		},
+	}
+}
+
+// NewInternalServerError creates a new INTERNAL_SERVER_ERROR (500) error response with a custom message
+func NewInternalServerError(message string) *ErrorResponse {
+	return &ErrorResponse{
+		Error: ErrorBody{
+			Code:    500,
+			Status:  "INTERNAL_SERVER_ERROR",
+			Message: message,
+		},
+	}
+}
+
+// NewForbidden creates a new FORBIDDEN (403) error response with a custom message
+func NewForbidden() *ErrorResponse {
+	return &ErrorResponse{
+		Error: ErrorBody{
+			Code:    403,
+			Status:  "FORBIDDEN",
+			Message: "Resource is forbidden",
+		},
+	}
+}
+
+// NewUnauthorized creates a new UNAUTHORIZED (401) error response with a custom message
+func NewUnauthorized(message string) *ErrorResponse {
+	return &ErrorResponse{
+		Error: ErrorBody{
+			Code:    401,
+			Status:  "UNAUTHORIZED",
+			Message: "Unauthorized access",
+		},
 	}
 }
 

@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 # Use .env.docker file for environment variables
 
@@ -10,7 +10,17 @@ services:
       - mysql_data:/var/lib/mysql
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p ${MYSQL_ROOT_PASSWORD}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p ${MYSQL_ROOT_PASSWORD}",
+        ]
       timeout: 20s
       retries: 10
     networks:
@@ -24,7 +34,15 @@ services:
     networks:
       - assistant-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/healthz"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:4000/healthz",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -35,7 +53,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api # env file copied in dockerfile
+      dockerfile: api.dockerfile # env file copied in dockerfile
     volumes:
       - ./resources/config:/app/resources/config
     depends_on:
