@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -16,10 +17,16 @@ import (
 	task_agent "github.com/ethanbaker/assistant/internal/agents/task"
 	agent_api "github.com/ethanbaker/assistant/internal/api/modules/agent"
 	health_api "github.com/ethanbaker/assistant/internal/api/modules/health"
+	outreach_api "github.com/ethanbaker/assistant/internal/api/modules/outreach"
 	"github.com/ethanbaker/assistant/internal/api/routes"
 	"github.com/ethanbaker/assistant/internal/config"
 	"github.com/ethanbaker/assistant/internal/database"
 	"github.com/ethanbaker/assistant/internal/domain"
+	"github.com/ethanbaker/assistant/internal/outreaches/test"
+	client_repo "github.com/ethanbaker/assistant/internal/repositories/client"
+	job_repo "github.com/ethanbaker/assistant/internal/repositories/job"
+	jobexecution_repo "github.com/ethanbaker/assistant/internal/repositories/jobexecution"
+	jobsubscription_repo "github.com/ethanbaker/assistant/internal/repositories/jobsubscription"
 	fact_repo "github.com/ethanbaker/assistant/internal/repositories/keyfact"
 	session_repo "github.com/ethanbaker/assistant/internal/repositories/session"
 	"github.com/ethanbaker/assistant/internal/services/gcal"
@@ -29,6 +36,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-yaml"
 )
+
+var outreaches = map[string]outreach_api.HandlerFunc{
+	"example-job": test.TestOutreach,
+}
 
 // Start the API server
 func main() {
@@ -68,6 +79,14 @@ func main() {
 	factRepo, err := fact_repo.NewMySQLRepository(db)
 	fatalOnErr(err)
 	sessionRepo, err := session_repo.NewMySQLRepository(db)
+	fatalOnErr(err)
+	jobRepo, err := job_repo.NewMySQLRepository(db)
+	fatalOnErr(err)
+	clientRepo, err := client_repo.NewMySQLRepository(db)
+	fatalOnErr(err)
+	jobSubscriptionRepo, err := jobsubscription_repo.NewMySQLRepository(db)
+	fatalOnErr(err)
+	jobExecutionRepo, err := jobexecution_repo.NewMySQLRepository(db)
 	fatalOnErr(err)
 
 	// 4.1. Agent Services
@@ -165,15 +184,35 @@ func main() {
 
 	// 5.1. Api Services
 	agentService := agent_api.NewService(agent_api.ServiceConfig{
-		SessionRepository: sessionRepo,
-		EntryAgent:        entryAgent,
+		SessionRepository:   sessionRepo,
+		ExecutionRepository: jobExecutionRepo,
+		EntryAgent:          entryAgent,
 	})
+	outreachClientService := outreach_api.NewClientService(clientRepo)
+	outreachJobService := outreach_api.NewJobService(jobRepo)
+	outreachSubscriptionService := outreach_api.NewSubscriptionService(clientRepo, jobRepo, jobSubscriptionRepo)
+	outreachExecutor := outreach_api.NewExecutor(outreach_api.ExecutorConfig{
+		JobRepository:          jobRepo,
+		ClientRepository:       clientRepo,
+		SubscriptionRepository: jobSubscriptionRepo,
+		ExecutionRepository:    jobExecutionRepo,
+		Handlers:               outreaches,
+	})
+	fatalOnErr(outreachExecutor.Start(context.Background()))
+	defer outreachExecutor.Stop()
 
 	// 5.2. Api Handlers
 	agentHandler := agent_api.NewHandler(agent_api.HandlerConfig{
-		Service: agentService,
+		Service:          agentService,
+		ClientRepository: clientRepo,
 	})
 	healthHandler := health_api.NewHandler()
+	outreachHandler := outreach_api.NewHandler(outreach_api.HandlerConfig{
+		AdminKey:            config.MustGetenv("OUTREACH_ADMIN_KEY"),
+		JobService:          outreachJobService,
+		ClientService:       outreachClientService,
+		SubscriptionService: outreachSubscriptionService,
+	})
 
 	// 7. Router
 	engine := gin.Default()
@@ -190,6 +229,12 @@ func main() {
 	internal.GET(routes.GET_SESSION_BY_UUID, agentHandler.GetSession)
 	internal.POST(routes.POST_MESSAGE_TO_SESSION, agentHandler.PostMessage)
 	internal.DELETE(routes.DELETE_SESSION, agentHandler.DeleteSession)
+	internal.POST(routes.POST_SESSION_JOB_EXECUTION_CONTEXT, agentHandler.AttachJobExecutionContext)
+
+	internal.POST(routes.POST_OUTREACH_JOB, outreachHandler.CreateJob)
+	internal.POST(routes.POST_OUTREACH_CLIENT, outreachHandler.RegisterClient)
+	internal.POST(routes.POST_OUTREACH_SUBSCRIPTION, outreachHandler.Subscribe)
+	internal.DELETE(routes.DELETE_OUTREACH_SUBSCRIPTION, outreachHandler.Unsubscribe)
 
 	// 9. Start
 	port := config.GetenvWithDefault("PORT", "8080")

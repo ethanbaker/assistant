@@ -2,9 +2,12 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ethanbaker/assistant/internal/domain"
+	clientrepo "github.com/ethanbaker/assistant/internal/repositories/client"
 	"github.com/ethanbaker/assistant/internal/repositories/session"
 	"github.com/ethanbaker/assistant/pkg/sdk"
 	"github.com/gin-gonic/gin"
@@ -13,7 +16,8 @@ import (
 
 // HandlerConfig defines configuration for the handler
 type HandlerConfig struct {
-	Service *Service
+	Service          *Service
+	ClientRepository clientrepo.Repository
 }
 
 // Handler defines dependencies for the agent handler
@@ -147,6 +151,56 @@ func (h *Handler) DeleteSession(c *gin.Context) {
 	}
 
 	c.JSON(sdk.NewSuccess(toSDKSession(sess)).AsGinResponse())
+}
+
+// AttachJobExecutionContext handles POST requests to add outreach execution context to a session.
+func (h *Handler) AttachJobExecutionContext(c *gin.Context) {
+	uuid := c.Param("uuid")
+
+	// Find client from api key in header
+	apiKey := strings.TrimSpace(c.GetHeader("X-Client-Key"))
+	if apiKey == "" {
+		c.JSON(sdk.NewUnauthorized("missing client key").AsGinResponse())
+		return
+	}
+
+	if h.ClientRepository == nil {
+		c.JSON(sdk.NewInternalServerError("Client repository is not configured").AsGinResponse())
+		return
+	}
+
+	client, err := h.ClientRepository.FindByApiKey(apiKey)
+	if err != nil {
+		c.JSON(sdk.NewInternalServerError("Failed to authenticate client").WithDetails(err.Error()).AsGinResponse())
+		return
+	}
+	if client == nil {
+		c.JSON(sdk.NewUnauthorized("invalid client key").AsGinResponse())
+		return
+	}
+
+	// Parse parameters
+	var req AttachJobExecutionContextRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(sdk.NewBadRequest("Could not parse request body").WithDetails(err.Error()).AsGinResponse())
+		return
+	}
+
+	// Attach job context
+	err = h.Service.AttachJobExecutionsContext(c.Request.Context(), uuid, int(client.ID), req.JobExecutionIDs)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrExecutionNotFound):
+			c.JSON(sdk.NewBadRequest(err.Error()).AsGinResponse())
+		case errors.Is(err, ErrExecutionForbidden):
+			c.JSON(sdk.NewForbidden().WithDetails(err.Error()).AsGinResponse())
+		default:
+			c.JSON(sdk.NewInternalServerError("Failed to attach job execution context").WithDetails(err.Error()).AsGinResponse())
+		}
+		return
+	}
+
+	c.JSON(sdk.NewSuccessMessage("Job execution context attached").AsGinResponse())
 }
 
 // Helper method to convert internal session to sdk session

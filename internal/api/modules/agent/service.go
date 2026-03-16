@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/ethanbaker/assistant/internal/domain"
 	"github.com/ethanbaker/assistant/internal/logger"
 	"github.com/ethanbaker/assistant/internal/prompts"
+	jobexecutionrepo "github.com/ethanbaker/assistant/internal/repositories/jobexecution"
 	"github.com/ethanbaker/assistant/internal/repositories/session"
 	"github.com/ethanbaker/assistant/pkg/sdk"
 	"github.com/google/uuid"
@@ -18,14 +21,20 @@ import (
 
 // ServiceConfig
 type ServiceConfig struct {
-	SessionRepository session.Repository
-	EntryAgent        domain.CustomAgent
+	SessionRepository   session.Repository
+	ExecutionRepository jobexecutionrepo.Repository
+	EntryAgent          domain.CustomAgent
 }
 
 // Service defines dependencies for the agent service
 type Service struct {
 	ServiceConfig
 }
+
+var (
+	ErrExecutionNotFound  = errors.New("job execution not found")
+	ErrExecutionForbidden = errors.New("job execution does not belong to client")
+)
 
 // NewService creates a new agent service instance
 func NewService(cfg ServiceConfig) *Service {
@@ -204,4 +213,50 @@ func (s *Service) GetItemCount(ctx context.Context, sessionID string) (int, erro
 	count := len(items)
 	logger.Debugf("GetItemCount succeeded for sessionID %s: %d items", sessionID, count)
 	return count, nil
+}
+
+// AttachJobExecutionsContext injects job execution payloads into a session as context items.
+func (s *Service) AttachJobExecutionsContext(ctx context.Context, sessionID string, clientID int, executionIDs []int) error {
+	if s.ExecutionRepository == nil {
+		return fmt.Errorf("execution repository not configured")
+	}
+
+	if len(executionIDs) == 0 {
+		return fmt.Errorf("job_execution_ids is required")
+	}
+
+	guid, err := uuid.Parse(sessionID)
+	if err != nil {
+		return fmt.Errorf("invalid session ID format: %v", err)
+	}
+
+	sess, err := s.SessionRepository.GetSession(ctx, guid)
+	if err != nil {
+		return err
+	}
+
+	for _, executionID := range executionIDs {
+		execution, findErr := s.ExecutionRepository.FindById(executionID)
+		if findErr != nil {
+			return fmt.Errorf("failed to find job execution %d: %w", executionID, findErr)
+		}
+		if execution == nil {
+			return ErrExecutionNotFound
+		}
+		if execution.ClientId != clientID {
+			return ErrExecutionForbidden
+		}
+
+		serialized, marshalErr := json.Marshal(execution)
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal execution %d: %w", executionID, marshalErr)
+		}
+
+		content := fmt.Sprintf("Outreach job execution context (id=%d): %s", executionID, string(serialized))
+		if injectErr := prompts.InjectContextItem(ctx, sess, content); injectErr != nil {
+			return fmt.Errorf("failed to inject execution %d into session: %w", executionID, injectErr)
+		}
+	}
+
+	return nil
 }
