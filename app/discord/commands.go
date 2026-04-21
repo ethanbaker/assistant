@@ -10,69 +10,65 @@ import (
 	"github.com/ethanbaker/assistant/pkg/sdk"
 )
 
-// onInteractionCreate handles interactions (slash commands)
+// onInteractionCreate dispatches slash command interactions.
 func (b *Bot) onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	switch i.Type {
-	case discordgo.InteractionApplicationCommand:
+	if i.Type == discordgo.InteractionApplicationCommand {
 		b.handleApplicationCommand(i)
 	}
 }
 
-// registerCommands registers the bot's slash commands with Discord
+// registerCommands registers the bot's slash commands with Discord.
 func (b *Bot) registerCommands() error {
-	// Define commands
 	commands := []*discordgo.ApplicationCommand{
 		{
-			Name: "ask", Description: "Ask me a question",
+			Name:        "ask",
+			Description: "Ask a one-off question",
 			Options: []*discordgo.ApplicationCommandOption{{
-				Type: discordgo.ApplicationCommandOptionString, Name: "prompt", Description: "Your question", Required: true,
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "prompt",
+				Description: "Your question",
+				Required:    true,
 			}},
 		},
 		{
-			Name: "conversation", Description: "Start a conversation thread with a prompt",
+			Name:        "conversation",
+			Description: "Start a persistent conversation thread",
 			Options: []*discordgo.ApplicationCommandOption{{
-				Type: discordgo.ApplicationCommandOptionString, Name: "prompt", Description: "Conversation starting prompt", Required: true,
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "prompt",
+				Description: "Opening message for the conversation",
+				Required:    true,
 			}},
 		},
 	}
 
-	// Register commands
-	guildID := b.guildID // empty = global commands
 	for _, cmd := range commands {
-		if _, err := b.dg.ApplicationCommandCreate(b.dg.State.User.ID, guildID, cmd); err != nil {
-			return fmt.Errorf("cannot create '%s' command: %w", cmd.Name, err)
+		if _, err := b.dg.ApplicationCommandCreate(b.dg.State.User.ID, b.guildID, cmd); err != nil {
+			return fmt.Errorf("cannot create %q command: %w", cmd.Name, err)
 		}
 	}
-
 	return nil
 }
 
-// unregisterCommands removes the bot's slash commands from Discord
+// unregisterCommands removes the bot's slash commands from Discord.
 func (b *Bot) unregisterCommands() error {
-	guildID := b.guildID
-	cmds, err := b.dg.ApplicationCommands(b.dg.State.User.ID, guildID)
+	cmds, err := b.dg.ApplicationCommands(b.dg.State.User.ID, b.guildID)
 	if err != nil {
 		return err
 	}
-
 	for _, c := range cmds {
 		if c.Name == "ask" || c.Name == "conversation" {
-			_ = b.dg.ApplicationCommandDelete(b.dg.State.User.ID, guildID, c.ID)
+			_ = b.dg.ApplicationCommandDelete(b.dg.State.User.ID, b.guildID, c.ID)
 		}
 	}
-
 	return nil
 }
 
-// handleApplicationCommand processes a slash command interaction
 func (b *Bot) handleApplicationCommand(i *discordgo.InteractionCreate) {
 	if i == nil {
 		return
 	}
-
-	name := i.ApplicationCommandData().Name
-
-	switch name {
+	switch i.ApplicationCommandData().Name {
 	case "ask":
 		b.handleAsk(i)
 	case "conversation":
@@ -80,28 +76,20 @@ func (b *Bot) handleApplicationCommand(i *discordgo.InteractionCreate) {
 	}
 }
 
-// handleAsk handles the "ask" command interaction
+// handleAsk processes the /ask command: creates an ephemeral one-off session.
 func (b *Bot) handleAsk(i *discordgo.InteractionCreate) {
-	// Extract the prompt from first provided option
-	options := i.ApplicationCommandData().Options
-	prompt := ""
-	if len(options) > 0 {
-		prompt = options[0].StringValue()
-	}
-
-	if strings.TrimSpace(prompt) == "" {
-		respondEphemeral(b.dg, i, "Please provide a prompt")
+	prompt := firstStringOption(i)
+	if prompt == "" {
+		respondEphemeral(b.dg, i, "Please provide a prompt.")
 		return
 	}
 
-	// Acknowledge creation and defer
-	deferReply(b.dg, i, true)
+	deferReply(b.dg, i, true) // ephemeral
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		// Create new session for this interaction
 		sess, err := b.api.CreateSession(ctx, &sdk.CreateSessionRequest{
 			UserID: i.Member.User.ID,
 		})
@@ -110,57 +98,44 @@ func (b *Bot) handleAsk(i *discordgo.InteractionCreate) {
 			return
 		}
 
-		// Send the message to the session
 		resp, err := b.api.SendMessage(ctx, sess.ID, &sdk.PostMessageRequest{Content: prompt})
 		if err != nil {
 			editFollowup(b.dg, i, fmt.Sprintf("Failed to send message: %v", err))
 			return
 		}
 
-		// Send final output
 		output := strings.TrimSpace(resp.FinalOutput)
 		if output == "" {
-			editFollowup(b.dg, i, NO_CONTENT)
-		} else {
-			editFollowup(b.dg, i, output)
+			output = noContent
 		}
+		editFollowup(b.dg, i, output)
 	}()
 }
 
-// handleConversation handles the "conversation" command interaction
+// handleConversation processes the /conversation command: creates a thread with a persistent session.
 func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
-	// Extract the prompt from first provided option
-	options := i.ApplicationCommandData().Options
-	prompt := ""
-	if len(options) > 0 {
-		prompt = options[0].StringValue()
-	}
-
-	if strings.TrimSpace(prompt) == "" {
+	prompt := firstStringOption(i)
+	if prompt == "" {
 		respondEphemeral(b.dg, i, "Please provide a prompt.")
 		return
 	}
 
-	// Make sure thread channel is configured
 	if b.threadChannelID == "" {
 		respondEphemeral(b.dg, i, "Thread channel is not configured.")
 		return
 	}
 
-	// Make sure this channel is the thread channel
 	if i.ChannelID != b.threadChannelID {
-		respondEphemeral(b.dg, i, fmt.Sprintf("Please use the <#%s> channel for conversations.", b.threadChannelID))
+		respondEphemeral(b.dg, i, fmt.Sprintf("Please use <#%s> to start conversations.", b.threadChannelID))
 		return
 	}
 
-	// Acknowledge creation and defer
 	deferReply(b.dg, i, false)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		// Create new session for this thread
 		sess, err := b.api.CreateSession(ctx, &sdk.CreateSessionRequest{
 			UserID: i.Member.User.ID,
 		})
@@ -169,23 +144,16 @@ func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
 			return
 		}
 
-		// Seed conversation
-		resp, err := b.api.SendMessage(ctx, sess.ID, &sdk.PostMessageRequest{
-			Content: prompt,
-		})
+		resp, err := b.api.SendMessage(ctx, sess.ID, &sdk.PostMessageRequest{Content: prompt})
 		if err != nil {
 			editFollowup(b.dg, i, fmt.Sprintf("Failed to send message: %v", err))
 			return
 		}
 
-		// Determine thread title: prefer resp.Summary, else truncate content
-		// TODO: call backend endpoint to summarize
-		title := fmt.Sprintf("Conversation %s", sess.ID[:4])
-
-		// Create thread under the configured parent channel
+		title := fmt.Sprintf("Conversation %s", sess.ID[:8])
 		thread, err := b.dg.ThreadStartComplex(b.threadChannelID, &discordgo.ThreadStart{
 			Name:                title,
-			AutoArchiveDuration: THREAD_ARCHIVE,
+			AutoArchiveDuration: threadArchiveDuration,
 			Type:                discordgo.ChannelTypeGuildPublicThread,
 		})
 		if err != nil {
@@ -193,17 +161,22 @@ func (b *Bot) handleConversation(i *discordgo.InteractionCreate) {
 			return
 		}
 
-		// Bind conversation to thread
 		b.conversations.Set(thread.ID, sess.ID)
 
-		// Post initial content in thread
 		output := strings.TrimSpace(resp.FinalOutput)
 		if output == "" {
-			editFollowup(b.dg, i, NO_CONTENT)
-		} else {
-			reply(b.dg, thread.ID, output)
+			output = noContent
 		}
-
-		editFollowup(b.dg, i, fmt.Sprintf("Created conversation thread: <%4s>", sess.ID[:4]))
+		reply(b.dg, thread.ID, output)
+		editFollowup(b.dg, i, fmt.Sprintf("Started conversation in <#%s>.", thread.ID))
 	}()
+}
+
+// firstStringOption extracts the first string option value from an interaction.
+func firstStringOption(i *discordgo.InteractionCreate) string {
+	opts := i.ApplicationCommandData().Options
+	if len(opts) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(opts[0].StringValue())
 }

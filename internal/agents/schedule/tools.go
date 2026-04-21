@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	gcal_service "github.com/ethanbaker/assistant/internal/services/gcal"
+	"github.com/ethanbaker/assistant/pkg/logger"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 	"github.com/openai/openai-go/v2/packages/param"
 )
@@ -16,7 +18,6 @@ func (sa *ScheduleAgent) registerTools() {
 		sa.createSearchEventsTools(),
 		sa.createGetTodayEventsTools(),
 		sa.createGetWeekEventsTools(),
-		sa.createGetMonthEventsTools(),
 		sa.createGetSpecificDayEventsTools(),
 		sa.createCreateEventTools(),
 		sa.createUpdateEventTools(),
@@ -66,7 +67,8 @@ type DeleteEventArgs struct {
 
 // createSearchEventsTools creates the search events tool
 func (sa *ScheduleAgent) createSearchEventsTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "search_calendar_events",
@@ -79,9 +81,9 @@ func (sa *ScheduleAgent) createSearchEventsTools() agents.FunctionTool {
 					"description": "Search query to find events by name or description",
 				},
 				"calendar_name": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Calendar name to search in (optional - if omitted, searches all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"additionalProperties": false,
@@ -97,18 +99,19 @@ func (sa *ScheduleAgent) createSearchEventsTools() agents.FunctionTool {
 
 // createGetTodayEventsTools creates the get today's events tool
 func (sa *ScheduleAgent) createGetTodayEventsTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "get_today_events",
-		Description: "Get all calendar events for today",
+		Description: "Get the user's schedule for today",
 		ParamsJSONSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"calendar_name": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"additionalProperties": false,
@@ -124,22 +127,23 @@ func (sa *ScheduleAgent) createGetTodayEventsTools() agents.FunctionTool {
 
 // createGetWeekEventsTools creates the get this week's events tool
 func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "get_week_events",
-		Description: "Get all calendar events for this week",
+		Description: "Get the user's schedule for the week",
 		ParamsJSONSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"calendar_name": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
-			"additionalProperties": false,
 			"required":             []string{"calendar_name"},
+			"additionalProperties": false,
 		},
 		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
@@ -149,40 +153,14 @@ func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
 	}
 }
 
-// createGetMonthEventsTools creates the get this month's events tool
-func (sa *ScheduleAgent) createGetMonthEventsTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
-
-	return agents.FunctionTool{
-		Name:        "get_month_events",
-		Description: "Get all calendar events for this month",
-		ParamsJSONSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"calendar_name": map[string]any{
-					"type":        "string",
-					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
-				},
-			},
-			"additionalProperties": false,
-			"required":             []string{"calendar_name"},
-		},
-		StrictJSONSchema: param.NewOpt(true),
-		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
-			return sa.handleGetMonthEvents(ctx, arguments)
-		},
-		IsEnabled: agents.FunctionToolEnabled(),
-	}
-}
-
 // createGetSpecificDayEventsTools creates the get events for specific day tool
 func (sa *ScheduleAgent) createGetSpecificDayEventsTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "get_specific_day_events",
-		Description: "Get all calendar events for a specific date",
+		Description: "Get the user's schedule for a specific date",
 		ParamsJSONSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -191,9 +169,9 @@ func (sa *ScheduleAgent) createGetSpecificDayEventsTools() agents.FunctionTool {
 					"description": "Date in YYYY-MM-DD format",
 				},
 				"calendar_name": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"additionalProperties": false,
@@ -209,7 +187,7 @@ func (sa *ScheduleAgent) createGetSpecificDayEventsTools() agents.FunctionTool {
 
 // createCreateEventTools creates the create calendar event tool
 func (sa *ScheduleAgent) createCreateEventTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
 
 	return agents.FunctionTool{
 		Name:        "create_calendar_event",
@@ -252,7 +230,7 @@ func (sa *ScheduleAgent) createCreateEventTools() agents.FunctionTool {
 
 // createUpdateEventTools creates the update calendar event tool
 func (sa *ScheduleAgent) createUpdateEventTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
 
 	return agents.FunctionTool{
 		Name:        "update_calendar_event",
@@ -270,19 +248,19 @@ func (sa *ScheduleAgent) createUpdateEventTools() agents.FunctionTool {
 					"enum":        calendarNames,
 				},
 				"title": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "New title of the event (optional)",
 				},
 				"description": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "New description of the event (optional)",
 				},
 				"start_time": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "New start time in RFC3339 format (optional)",
 				},
 				"end_time": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "New end time in RFC3339 format (optional)",
 				},
 			},
@@ -299,7 +277,7 @@ func (sa *ScheduleAgent) createUpdateEventTools() agents.FunctionTool {
 
 // createDeleteEventTools creates the delete calendar event tool
 func (sa *ScheduleAgent) createDeleteEventTools() agents.FunctionTool {
-	calendarNames := sa.getCalendarNamesList()
+	calendarNames := sa.calendarService.GetCalendarNamesList()
 
 	return agents.FunctionTool{
 		Name:        "delete_calendar_event",
@@ -336,16 +314,12 @@ func (sa *ScheduleAgent) handleSearchEvents(ctx context.Context, arguments strin
 		return fmt.Sprintf("DRY RUN: Would search calendar events with args: %s", arguments), nil
 	}
 
+	arguments = normalizeArguments(arguments)
+
 	// Parse arguments
 	var args SearchEventsArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	// Make sure calendar name is not nil
-	calendarName := ""
-	if args.CalendarName != nil {
-		calendarName = *args.CalendarName
 	}
 
 	// Validate fields
@@ -353,7 +327,8 @@ func (sa *ScheduleAgent) handleSearchEvents(ctx context.Context, arguments strin
 		return nil, fmt.Errorf("query is required")
 	}
 
-	if !sa.isValidCalendarName(calendarName) {
+	calendarName := refWithDefault(args.CalendarName, "")
+	if !sa.calendarService.IsValidCalendarName(calendarName) {
 		return nil, fmt.Errorf("invalid calendar name: %s", calendarName)
 	}
 
@@ -363,7 +338,7 @@ func (sa *ScheduleAgent) handleSearchEvents(ctx context.Context, arguments strin
 		return nil, fmt.Errorf("failed to search events: %w", err)
 	}
 
-	return sa.formatEventsResponse(events), nil
+	return formatEventsResponse(events), nil
 }
 
 // handleGetTodayEvents processes the get today's events tool invocation
@@ -372,20 +347,17 @@ func (sa *ScheduleAgent) handleGetTodayEvents(ctx context.Context, arguments str
 		return fmt.Sprintf("DRY RUN: Would get today's calendar events with args: %s", arguments), nil
 	}
 
+	arguments = normalizeArguments(arguments)
+
 	// Parse arguments
 	var args GetEventsArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
-	// Make sure calendar name is not nil
-	calendarName := ""
-	if args.CalendarName != nil {
-		calendarName = *args.CalendarName
-	}
-
 	// Validate fields
-	if !sa.isValidCalendarName(calendarName) {
+	calendarName := refWithDefault(args.CalendarName, "")
+	if !sa.calendarService.IsValidCalendarName(calendarName) {
 		return nil, fmt.Errorf("invalid calendar name: %s", calendarName)
 	}
 
@@ -395,7 +367,7 @@ func (sa *ScheduleAgent) handleGetTodayEvents(ctx context.Context, arguments str
 		return nil, fmt.Errorf("failed to get today's events: %w", err)
 	}
 
-	return sa.formatEventsResponse(events), nil
+	return formatEventsResponse(events), nil
 }
 
 // handleGetWeekEvents processes the get week events tool invocation
@@ -404,20 +376,17 @@ func (sa *ScheduleAgent) handleGetWeekEvents(ctx context.Context, arguments stri
 		return fmt.Sprintf("DRY RUN: Would get this week's calendar events with args: %s", arguments), nil
 	}
 
+	arguments = normalizeArguments(arguments)
+
 	// Parse arguments
 	var args GetEventsArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
-	// Make sure calendar name is not nil
-	calendarName := ""
-	if args.CalendarName != nil {
-		calendarName = *args.CalendarName
-	}
-
 	// Validate fields
-	if !sa.isValidCalendarName(calendarName) {
+	calendarName := refWithDefault(args.CalendarName, "")
+	if !sa.calendarService.IsValidCalendarName(calendarName) {
 		return nil, fmt.Errorf("invalid calendar name: %s", calendarName)
 	}
 
@@ -427,43 +396,7 @@ func (sa *ScheduleAgent) handleGetWeekEvents(ctx context.Context, arguments stri
 		return nil, fmt.Errorf("failed to get week events: %w", err)
 	}
 
-	return sa.formatEventsResponse(events), nil
-}
-
-// handleGetMonthEvents processes the get month events tool invocation
-func (sa *ScheduleAgent) handleGetMonthEvents(ctx context.Context, arguments string) (any, error) {
-	if sa.ShouldDryRun(ctx) {
-		return fmt.Sprintf("DRY RUN: Would get this month's calendar events with args: %s", arguments), nil
-	}
-
-	// Parse arguments
-	var args GetEventsArgs
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return nil, fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	// Make sure calendar name is not nil
-	calendarName := ""
-	if args.CalendarName != nil {
-		calendarName = *args.CalendarName
-	}
-
-	// Validate fields
-	if !sa.isValidCalendarName(calendarName) {
-		return nil, fmt.Errorf("invalid calendar name: %s", calendarName)
-	}
-
-	// Get events for this month
-	now := time.Now()
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	end := start.AddDate(0, 1, 0) // Start of next month
-
-	events, err := sa.calendarService.GetEventsForTimeRange(ctx, start, end, calendarName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get month events: %w", err)
-	}
-
-	return sa.formatEventsResponse(events), nil
+	return formatEventsResponse(events), nil
 }
 
 // handleGetSpecificDayEvents processes the get specific day events tool invocation
@@ -472,33 +405,33 @@ func (sa *ScheduleAgent) handleGetSpecificDayEvents(ctx context.Context, argumen
 		return fmt.Sprintf("DRY RUN: Would get specific day's calendar events with args: %s", arguments), nil
 	}
 
+	arguments = normalizeArguments(arguments)
+
 	// Parse arguments
 	var args GetSpecificDayEventsArgs
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
-	// Make sure calendar name is not nil
-	calendarName := ""
-	if args.CalendarName != nil {
-		calendarName = *args.CalendarName
-	}
+	calendarName := refWithDefault(args.CalendarName, "")
 
 	// Validate fields
 	if args.Date == "" {
 		return nil, fmt.Errorf("date is required")
 	}
-
 	if !isValidDate(args.Date) {
 		return nil, fmt.Errorf("invalid date format, expected YYYY-MM-DD")
 	}
-
-	if !sa.isValidCalendarName(calendarName) {
+	if !sa.calendarService.IsValidCalendarName(calendarName) {
 		return nil, fmt.Errorf("invalid calendar name: %s", calendarName)
 	}
 
+	if calendarName == "personal" {
+		logger.Info("here")
+	}
+
 	// Parse date
-	targetDate, err := time.Parse(DATE_FORMAT, args.Date)
+	targetDate, err := time.Parse(gcal_service.DATE_FORMAT, args.Date)
 	if err != nil {
 		return nil, fmt.Errorf("invalid date format, expected YYYY-MM-DD: %w", err)
 	}
@@ -512,7 +445,7 @@ func (sa *ScheduleAgent) handleGetSpecificDayEvents(ctx context.Context, argumen
 		return nil, fmt.Errorf("failed to get events for specific day: %w", err)
 	}
 
-	return sa.formatEventsResponse(events), nil
+	return formatEventsResponse(events), nil
 }
 
 // handleCreateEvent processes the create event tool invocation
@@ -520,6 +453,8 @@ func (sa *ScheduleAgent) handleCreateEvent(ctx context.Context, arguments string
 	if sa.ShouldDryRun(ctx) {
 		return fmt.Sprintf("DRY RUN: Would create calendar event with args: %s", arguments), nil
 	}
+
+	arguments = normalizeArguments(arguments)
 
 	// Parse arguments
 	var args CreateEventArgs
@@ -541,36 +476,18 @@ func (sa *ScheduleAgent) handleCreateEvent(ctx context.Context, arguments string
 		return nil, fmt.Errorf("calendar_name is required")
 	}
 
-	if !sa.isValidCalendarName(args.CalendarName) {
-		return nil, fmt.Errorf("invalid calendar name: %s", args.CalendarName)
-	}
-
-	// Parse times
-	startTimeInput, err := time.Parse(time.RFC3339, args.StartTime)
-	if err != nil {
-		return nil, fmt.Errorf("invalid start_time format, expected RFC3339: %w", err)
-	}
-
-	endTimeInput, err := time.Parse(time.RFC3339, args.EndTime)
-	if err != nil {
-		return nil, fmt.Errorf("invalid end_time format, expected RFC3339: %w", err)
-	}
-
-	// Create start and end times in the correct timezone
-	startTime := time.Date(startTimeInput.Year(), startTimeInput.Month(), startTimeInput.Day(), startTimeInput.Hour(), startTimeInput.Minute(), startTimeInput.Second(), startTimeInput.Nanosecond(), sa.timezone)
-	endTime := time.Date(endTimeInput.Year(), endTimeInput.Month(), endTimeInput.Day(), endTimeInput.Hour(), endTimeInput.Minute(), endTimeInput.Second(), endTimeInput.Nanosecond(), sa.timezone)
-
-	// Validate that end time is after start time
-	if endTime.Before(startTime) || endTime.Equal(startTime) {
-		return nil, fmt.Errorf("end_time must be after start_time")
-	}
-
-	event, err := sa.calendarService.CreateEvent(ctx, args.Title, args.Description, startTime, endTime, args.CalendarName)
+	event, err := sa.calendarService.CreateEvent(ctx, gcal_service.CreateEventInput{
+		Title:        args.Title,
+		Description:  args.Description,
+		Start:        args.StartTime,
+		End:          args.EndTime,
+		CalendarName: args.CalendarName,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event: %w", err)
 	}
 
-	return sa.formatEventResponse(event), nil
+	return formatEventResponse(event), nil
 }
 
 // handleUpdateEvent processes the update event tool invocation
@@ -578,6 +495,8 @@ func (sa *ScheduleAgent) handleUpdateEvent(ctx context.Context, arguments string
 	if sa.ShouldDryRun(ctx) {
 		return fmt.Sprintf("DRY RUN: Would update calendar event with args: %s", arguments), nil
 	}
+
+	arguments = normalizeArguments(arguments)
 
 	// Parse arguments
 	var args UpdateEventArgs
@@ -593,53 +512,19 @@ func (sa *ScheduleAgent) handleUpdateEvent(ctx context.Context, arguments string
 		return nil, fmt.Errorf("calendar_name is required")
 	}
 
-	if !sa.isValidCalendarName(args.CalendarName) {
-		return nil, fmt.Errorf("invalid calendar name: %s", args.CalendarName)
-	}
-
-	// Parse times if provided
-	var startTime, endTime time.Time
-	var err error
-
-	if args.StartTime != nil && *args.StartTime != "" {
-		startTimeInput, err := time.Parse(time.RFC3339, *args.StartTime)
-		if err != nil {
-			return nil, fmt.Errorf("invalid start_time format, expected RFC3339: %w", err)
-		}
-		startTime = time.Date(startTimeInput.Year(), startTimeInput.Month(), startTimeInput.Day(), startTimeInput.Hour(), startTimeInput.Minute(), startTimeInput.Second(), startTimeInput.Nanosecond(), sa.timezone)
-	}
-
-	if args.EndTime != nil && *args.EndTime != "" {
-		endTimeInput, err := time.Parse(time.RFC3339, *args.EndTime)
-		if err != nil {
-			return nil, fmt.Errorf("invalid end_time format, expected RFC3339: %w", err)
-		}
-		endTime = time.Date(endTimeInput.Year(), endTimeInput.Month(), endTimeInput.Day(), endTimeInput.Hour(), endTimeInput.Minute(), endTimeInput.Second(), endTimeInput.Nanosecond(), sa.timezone)
-	}
-
-	// Validate that end time is after start time if both are provided
-	if !startTime.IsZero() && !endTime.IsZero() {
-		if endTime.Before(startTime) || endTime.Equal(startTime) {
-			return nil, fmt.Errorf("end_time must be after start_time")
-		}
-	}
-
-	title := ""
-	if args.Title != nil {
-		title = *args.Title
-	}
-
-	description := ""
-	if args.Description != nil {
-		description = *args.Description
-	}
-
-	event, err := sa.calendarService.UpdateEvent(ctx, args.EventID, title, description, startTime, endTime, args.CalendarName)
+	event, err := sa.calendarService.UpdateEvent(ctx, gcal_service.UpdateEventInput{
+		EventID:      args.EventID,
+		CalendarName: args.CalendarName,
+		Title:        args.Title,
+		Description:  args.Description,
+		Start:        args.StartTime,
+		End:          args.EndTime,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to update event: %w", err)
 	}
 
-	return sa.formatEventResponse(event), nil
+	return formatEventResponse(event), nil
 }
 
 // handleDeleteEvent processes the delete event tool invocation
@@ -647,6 +532,8 @@ func (sa *ScheduleAgent) handleDeleteEvent(ctx context.Context, arguments string
 	if sa.ShouldDryRun(ctx) {
 		return fmt.Sprintf("DRY RUN: Would delete calendar event with args: %s", arguments), nil
 	}
+
+	arguments = normalizeArguments(arguments)
 
 	// Parse arguments
 	var args DeleteEventArgs
@@ -662,11 +549,14 @@ func (sa *ScheduleAgent) handleDeleteEvent(ctx context.Context, arguments string
 		return nil, fmt.Errorf("calendar_name is required")
 	}
 
-	if !sa.isValidCalendarName(args.CalendarName) {
+	if !sa.calendarService.IsValidCalendarName(args.CalendarName) {
 		return nil, fmt.Errorf("invalid calendar name: %s", args.CalendarName)
 	}
 
-	err := sa.calendarService.DeleteEvent(ctx, args.EventID, args.CalendarName)
+	err := sa.calendarService.DeleteEvent(ctx, gcal_service.DeleteEventInput{
+		EventID:      args.EventID,
+		CalendarName: args.CalendarName,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete event: %w", err)
 	}
@@ -677,4 +567,23 @@ func (sa *ScheduleAgent) handleDeleteEvent(ctx context.Context, arguments string
 		"event_id":      args.EventID,
 		"calendar_name": args.CalendarName,
 	}, nil
+}
+
+// Helper function to get a value with default
+func refWithDefault[T any](v *T, d T) T {
+	if v == nil {
+		return d
+	}
+	return *v
+}
+
+// enumWithNull appends a JSON null option to a string enum.
+func enumWithNull(values []string) []any {
+	enumValues := make([]any, 0, len(values)+1)
+	for _, v := range values {
+		enumValues = append(enumValues, v)
+	}
+	enumValues = append(enumValues, nil)
+
+	return enumValues
 }

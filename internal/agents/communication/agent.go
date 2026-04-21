@@ -3,44 +3,61 @@ package communication
 import (
 	"context"
 	"errors"
-	"time"
+	"os"
 
-	"github.com/ethanbaker/assistant/internal/stores/memory"
-	"github.com/ethanbaker/assistant/internal/stores/session"
-	"github.com/ethanbaker/assistant/pkg/agent"
-	"github.com/ethanbaker/assistant/pkg/utils"
+	"github.com/ethanbaker/assistant/internal/prompts"
+	"github.com/ethanbaker/assistant/pkg/config"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
 
+// CommunicationAgentConfig provided on construct
+type CommunicationAgentConfig struct {
+	Model               string
+	PromptFile          string
+	TelegramAppID       string
+	TelegramAPIHash     string
+	TelegramSessionFile string
+}
+
 // CommunicationAgent provides communication and messaging capabilities
 type CommunicationAgent struct {
-	agent        *agents.Agent
-	config       *utils.Config
-	memoryStore  *memory.Store
-	sessionStore session.Store
-	basePrompt   string
+	agent      *agents.Agent
+	basePrompt string
+
+	telegramAppID       string
+	telegramAPIHash     string
+	telegramSessionFile string
 }
 
 // NewCommunicationAgent creates a new communication agent
-func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*CommunicationAgent, error) {
+func NewCommunicationAgent(cfg CommunicationAgentConfig) (*CommunicationAgent, error) {
+	if cfg.Model == "" {
+		return nil, errors.New("Model is required")
+	}
+	if cfg.PromptFile == "" {
+		return nil, errors.New("Prompt file path is required")
+	}
+	if cfg.TelegramAppID == "" {
+		return nil, errors.New("TelegramAppID is required")
+	}
+	if cfg.TelegramAPIHash == "" {
+		return nil, errors.New("TelegramAPIHash is required")
+	}
+	if cfg.TelegramSessionFile == "" {
+		return nil, errors.New("TelegramSessionFile is required")
+	}
+
 	ca := &CommunicationAgent{
-		config:       config,
-		memoryStore:  memoryStore,
-		sessionStore: sessionStore,
+		telegramAppID:       cfg.TelegramAppID,
+		telegramAPIHash:     cfg.TelegramAPIHash,
+		telegramSessionFile: cfg.TelegramSessionFile,
 	}
 
-	// Get sysprompt path
-	path := config.Get("COMMUNICATION_SYSPROMPT_PATH")
-	if path == "" {
-		return nil, errors.New("COMMUNICATION_SYSPROMPT_PATH not set in environment")
-	}
-
-	// Load instructions from file with fallback to hardcoded version
-	var err error
-	ca.basePrompt, err = utils.LoadPrompt(path)
+	data, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
 		return nil, err
 	}
+	ca.basePrompt = string(data)
 
 	// Create MCP servers
 	telegramMCP, err := ca.getTelegramMCP()
@@ -54,12 +71,11 @@ func NewCommunicationAgent(memoryStore *memory.Store, sessionStore session.Store
 
 	// Create the underlying agent
 	ca.agent = agents.New("communication-agent").
-		WithModel(config.Get("MODEL")).
+		WithModel(cfg.Model).
 		WithMCPServers(mcpServers).
 		WithInstructionsFunc(ca.getPrompt)
 
-	// Register tools
-	//ca.registerTools()
+	ca.registerTools()
 
 	return ca, nil
 }
@@ -74,23 +90,13 @@ func (ca *CommunicationAgent) ID() string {
 	return "communication-agent"
 }
 
-// Config returns the agent configuration
-func (ca *CommunicationAgent) Config() *utils.Config {
-	return ca.config
-}
-
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (ca *CommunicationAgent) ShouldDryRun(ctx context.Context) bool {
-	return ca.config.GetBool("DRY_RUN")
+	return config.GetenvValue("DRY_RUN") == "true"
 }
 
 // getPrompt returns the prompt for the agent
 func (ca *CommunicationAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(ca.basePrompt)
-	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Today's date: " + now.Format("Monday, 2006-01-02"))
-
+	builder := prompts.NewPromptBuilder(ca.basePrompt)
 	return builder.Build(), nil
 }

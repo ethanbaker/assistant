@@ -3,173 +3,125 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/ethanbaker/assistant/pkg/logger"
 	"github.com/ethanbaker/assistant/pkg/sdk"
-	"github.com/ethanbaker/assistant/pkg/utils"
+	"github.com/gin-gonic/gin"
 )
 
-const NO_CONTENT = "(no content)"
-const THREAD_ARCHIVE = 1440 // 24 hours
+const noContent = "(no content)"
+const threadArchiveDuration = 1440 // 24 hours in minutes
 
-// Store interface for managing conversations
-// Keying strategy:
-// - For channel free-chat: key is channelID
-// - For thread conversation: key is threadID
-// '/ask' commands are not stored here, as they are one-off and don't require persistence
-type ConversationStore interface {
-	Get(key string) (string, bool)
-	Set(key, uuid string)
-	Delete(key string)
-}
-
-// Bot represents the Discord bot instance
+// Bot represents the Discord bot instance.
 type Bot struct {
-	config *utils.Config      // Configuration struct
-	dg     *discordgo.Session // Discord session
-	api    *sdk.Client        // Backend API client
+	dg  *discordgo.Session
+	api *sdk.Client
 
-	conversations ConversationStore // In-memory store for conversations
+	conversations ConversationRepository
 
-	// Important configuration values
-	botChannelID           string // Channel ID where the bot listens for messages
-	botChannelContextLimit int    // Limit for bot channel messages
-
-	threadChannelID           string // Channel ID where conversation threads are created
-	threadChannelContextLimit int    // Limit for thread context messages
-	guildID                   string // Guild ID for slash commands (empty for global)
-	userID                    string // User ID for outreach messages
+	// Discord config
+	botChannelID    string
+	threadChannelID string
+	guildID         string
+	userID          string
 }
 
-// Create a new Discord bot instance
-func NewBot(cfg *utils.Config, store ConversationStore) (*Bot, error) {
-	// Get discord token
-	token := cfg.Get("DISCORD_TOKEN")
+type BotConfig struct {
+	SDKClient              *sdk.Client
+	ConversationRepository ConversationRepository
+
+	Token           string
+	BotChannelID    string
+	ThreadChannelID string
+	UserID          string
+	GuildID         string
+}
+
+// NewBot creates a new Bot from provided config
+func NewBot(cfg BotConfig) (*Bot, error) {
+	// Validate config
+	if cfg.SDKClient == nil {
+		return nil, fmt.Errorf("sdk client is required")
+	}
+	if cfg.ConversationRepository == nil {
+		return nil, fmt.Errorf("conversation repository is required")
+	}
+	token := strings.TrimSpace(cfg.Token)
 	if token == "" {
-		return nil, fmt.Errorf("DISCORD_TOKEN not set in config or environment")
+		return nil, fmt.Errorf("token is required")
+	}
+	botChannelId := strings.TrimSpace(cfg.BotChannelID)
+	if botChannelId == "" {
+		return nil, fmt.Errorf("bot channel id is required")
+	}
+	threadChannelId := strings.TrimSpace(cfg.ThreadChannelID)
+	if threadChannelId == "" {
+		return nil, fmt.Errorf("thread channel id is required")
+	}
+	userId := strings.TrimSpace(cfg.UserID)
+	if userId == "" {
+		return nil, fmt.Errorf("user id is required")
+	}
+	guildId := strings.TrimSpace(cfg.GuildID)
+	if guildId == "" {
+		logger.Info("GUILD_ID not set, using global commands")
 	}
 
-	// Get important configuration values
-	botChannelID := cfg.Get("BOT_CHANNEL_ID")
-	if botChannelID == "" {
-		return nil, fmt.Errorf("BOT_CHANNEL_ID not set in config or environment")
-	}
-
-	botChannelContextLimit := cfg.GetIntWithDefault("BOT_CHANNEL_CONTEXT_LIMIT", 15)
-	if botChannelContextLimit <= 0 {
-		return nil, fmt.Errorf("BOT_CHANNEL_CONTEXT_LIMIT must be a positive integer")
-	}
-
-	threadChannelID := cfg.Get("THREAD_CHANNEL_ID")
-	if threadChannelID == "" {
-		return nil, fmt.Errorf("THREAD_CHANNEL_ID not set in config or environment")
-	}
-
-	threadChannelContextLimit := cfg.GetIntWithDefault("THREAD_CHANNEL_CONTEXT_LIMIT", 15)
-	if threadChannelContextLimit <= 0 {
-		return nil, fmt.Errorf("THREAD_CHANNEL_CONTEXT_LIMIT must be a positive integer")
-	}
-
-	userID := cfg.Get("USER_ID")
-	if userID == "" {
-		return nil, fmt.Errorf("USER_ID not set in config or environment")
-	}
-
-	guildID := cfg.Get("GUILD_ID") // empty = global commands
-	if guildID == "" {
-		log.Println("GUILD_ID not set, using global commands")
-	}
-
-	// Get base URL and api key
-	baseURL := cfg.Get("BACKEND_BASE_URL")
-	if baseURL == "" {
-		return nil, fmt.Errorf("BACKEND_BASE_URL not set in config or environment")
-	}
-
-	apiKey := cfg.Get("BACKEND_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("BACKEND_API_KEY not set in config or environment")
-	}
-
-	// Create a new Discord session
+	// Create new discord session
 	dg, err := discordgo.New("Bot " + strings.TrimPrefix(token, "Bot "))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create discord session: %w", err)
 	}
 
-	// Create the bot instance
-	b := &Bot{
-		config:                    cfg,
-		dg:                        dg,
-		api:                       sdk.NewClient(baseURL, apiKey),
-		conversations:             store,
-		botChannelID:              botChannelID,
-		botChannelContextLimit:    botChannelContextLimit,
-		threadChannelID:           threadChannelID,
-		guildID:                   guildID,
-		threadChannelContextLimit: threadChannelContextLimit,
-		userID:                    userID,
-	}
-
-	// Intents
+	// Declare intents
 	dg.Identify.Intents = discordgo.IntentsGuilds |
 		discordgo.IntentsGuildMessages |
 		discordgo.IntentsMessageContent |
 		discordgo.IntentsGuildMessageReactions |
 		discordgo.IntentsDirectMessages
 
-	// Handlers
+	// Create new bot instance
+	b := &Bot{
+		dg:              dg,
+		api:             cfg.SDKClient,
+		conversations:   cfg.ConversationRepository,
+		botChannelID:    botChannelId,
+		threadChannelID: threadChannelId,
+		guildID:         guildId,
+		userID:          userId,
+	}
+
+	// Create handlers
 	dg.AddHandler(b.onReady)
 	dg.AddHandler(b.onMessageCreate)
 	dg.AddHandler(b.onInteractionCreate)
 
-	// Outreach API
-	if err := b.registerOutreach(); err != nil {
-		return nil, err
-	}
-
-	log.Printf("[DISCORD]: Registered outreach callback for user ID %s", userID)
-
-	go b.startAPI()
-
 	return b, nil
 }
 
-// Start the bot and connect to Discord
-func (b *Bot) Start() error {
+// start opens the Discord connection and registers slash commands.
+func (b *Bot) start() error {
 	if err := b.dg.Open(); err != nil {
 		return err
 	}
-
-	// Register slash commands
 	return b.registerCommands()
 }
 
-// Stop the bot and clean up resources
-func (b *Bot) Stop() error {
+// stop cleanly shuts down the bot.
+func (b *Bot) stop() error {
 	_ = b.unregisterCommands()
-	if err := b.dg.Close(); err != nil {
-		return err
-	}
-
-	if err := b.unregisterOutreach(); err != nil {
-		return err
-	}
-
-	return nil
+	return b.dg.Close()
 }
 
-// onReady is called when the bot is ready
 func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
-	log.Printf("[DISCORD]: Logged in as: %s#%s", r.User.Username, r.User.Discriminator)
+	logger.Infof("logged in as %s#%s", r.User.Username, r.User.Discriminator)
 }
 
-// onMessageCreate handles incoming messages
 func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore messages from the bot itself
+	// Ignore messages the bot created
 	if m.Author == nil || m.Author.ID == s.State.User.ID {
 		return
 	}
@@ -180,27 +132,25 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
-	// If it's the configured bot channel, handle
+	// Free-chat in the configured bot channel
 	if m.ChannelID == b.botChannelID {
-		go b.handleMessageInChannel(m.ChannelID, m.Author, content, m.Message)
+		go b.handleMessageInChannel(m.ChannelID, m.Author, content)
 		return
 	}
 
-	// If the channel has a bound conversation, handle.
+	// Any channel with a bound conversation (e.g. a thread)
 	if _, ok := b.conversations.Get(m.ChannelID); ok {
-		go b.handleMessageInChannel(m.ChannelID, m.Author, content, m.Message)
+		go b.handleMessageInChannel(m.ChannelID, m.Author, content)
 	}
 }
 
-// handleMessageInChannel processes messages in the bot channel or bound conversation channels
-func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, content string, _ *discordgo.Message) {
+// handleMessageInChannel routes a message through the agent API and replies.
+func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, content string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Ensure a conversation exists per channel
-	conversationID, ok := b.conversations.Get(channelID)
+	sessionID, ok := b.conversations.Get(channelID)
 	if !ok {
-		// Create new session if not found
 		sess, err := b.api.CreateSession(ctx, &sdk.CreateSessionRequest{
 			UserID: user.ID,
 		})
@@ -209,13 +159,11 @@ func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, con
 			return
 		}
 
-		// Bind the session to the channel
-		conversationID = sess.ID
-		b.conversations.Set(channelID, conversationID)
+		sessionID = sess.ID
+		b.conversations.Set(channelID, sessionID)
 	}
 
-	// Add the message to the session
-	resp, err := b.api.SendMessage(ctx, conversationID, &sdk.PostMessageRequest{
+	resp, err := b.api.SendMessage(ctx, sessionID, &sdk.PostMessageRequest{
 		Content: decorateDiscordContext(user, content),
 	})
 	if err != nil {
@@ -223,9 +171,25 @@ func (b *Bot) handleMessageInChannel(channelID string, user *discordgo.User, con
 		return
 	}
 
-	// If the response is empty, just return filler
-	output := strings.TrimSpace(resp.FinalOutput)
-	if output != "" {
+	if output := strings.TrimSpace(resp.FinalOutput); output != "" {
 		reply(b.dg, channelID, output)
 	}
+}
+
+// onOutreachMessage handles incoming webhook calls from the backend outreach system.
+func (b *Bot) onOutreachMessage(c *gin.Context, payload sdk.WebhookPayload) error {
+	if b.dg == nil {
+		return fmt.Errorf("discord session is nil")
+	}
+
+	dmChannel, err := b.dg.UserChannelCreate(b.userID)
+	if err != nil {
+		logger.Errorf("failed to create DM channel with user %s: %v", b.userID, err)
+		return fmt.Errorf("failed to create dm channel: %v", err)
+	}
+
+	replySanitizeHTML(b.dg, dmChannel.ID, payload.Content)
+
+	logger.Infof("sent outreach message to user %s (id=%d)", b.userID, payload.ID)
+	return nil
 }

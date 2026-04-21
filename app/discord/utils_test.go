@@ -2,7 +2,7 @@ package main
 
 import "testing"
 
-func TestSanitizeHTMLtoDiscordMarkdown(t *testing.T) {
+func TestSanitizeHTMLToDiscordMarkdown(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
@@ -23,7 +23,7 @@ func TestSanitizeHTMLtoDiscordMarkdown(t *testing.T) {
 	for _, test := range tests {
 		result := sanitizeHTMLToDiscordMarkdown(test.input)
 		if result != test.expected {
-			t.Errorf("For input '%s', expected '%s' but got '%s'", test.input, test.expected, result)
+			t.Errorf("input %q: expected %q, got %q", test.input, test.expected, result)
 		}
 	}
 }

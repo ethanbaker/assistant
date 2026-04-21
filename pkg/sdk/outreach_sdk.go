@@ -2,89 +2,48 @@ package sdk
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-
-	"github.com/ethanbaker/api/pkg/api_types"
 )
 
-// RegisterImplementation registers a new outreach implementation
-func (c *Client) RegisterImplementation(ctx context.Context, req *OutreachRegisterRequest) (*OutreachRegisterResponse, error) {
-	path := "/api/outreach/implementations"
+// CreateJob creates a new outreach job (requires admin API key)
+func (c *Client) CreateJob(ctx context.Context, req *CreateJobRequest) (*CreateJobResponse, error) {
+	path := "/api/internal/outreach/jobs"
 
-	var out ApiResponse[OutreachRegisterResponse]
+	var out SuccessResponse[CreateJobResponse]
 	if err := c.NewRequest(ctx, http.MethodPost, path, req, &out).WithApiKey(c.apiKey).doJSON(); err != nil {
 		return nil, err
 	}
 
-	// Check for success
-	switch out.Status {
-	case api_types.StatusFail:
-		return nil, fmt.Errorf("failed to register implementation: %s", out.Message)
-	case api_types.StatusError:
-		return nil, fmt.Errorf("error registering implementation (%s): %v", out.Message, out.Error)
-	}
-
 	return &out.Data, nil
 }
 
-// UnregisterImplementation removes an outreach implementation
-func (c *Client) UnregisterImplementation(ctx context.Context, clientId string, creds OutreachCredentials) error {
-	path := "/api/outreach/implementations/"
-	req := &OutreachUnregisterRequest{ClientId: clientId}
+// RegisterClient registers a new outreach client and returns its ID and API key (requires admin API key)
+func (c *Client) RegisterClient(ctx context.Context, req *RegisterClientRequest) (*RegisterClientResponse, error) {
+	path := "/api/internal/outreach/clients"
 
-	var out ApiResponse[map[string]string]
-	if err := c.NewRequest(ctx, http.MethodDelete, path, req, &out).WithClientCredentials(creds.ClientId, creds.ClientSecret).doJSON(); err != nil {
-		return err
-	}
-
-	// Check for success
-	switch out.Status {
-	case api_types.StatusFail:
-		return fmt.Errorf("failed to unregister implementation: %s", out.Message)
-	case api_types.StatusError:
-		return fmt.Errorf("error unregistering implementation (%s): %v", out.Message, out.Error)
-	}
-
-	return nil
-}
-
-// GetImplementations retrieves all registered implementations
-func (c *Client) GetImplementations(ctx context.Context, creds OutreachCredentials) (*OutreachListImplementationsResponse, error) {
-	path := "/api/outreach/implementations"
-
-	var out ApiResponse[OutreachListImplementationsResponse]
-	if err := c.NewRequest(ctx, http.MethodGet, path, nil, &out).WithClientCredentials(creds.ClientId, creds.ClientSecret).doJSON(); err != nil {
+	var out SuccessResponse[RegisterClientResponse]
+	if err := c.NewRequest(ctx, http.MethodPost, path, req, &out).WithApiKey(c.apiKey).doJSON(); err != nil {
 		return nil, err
 	}
 
-	// Check for success
-	switch out.Status {
-	case api_types.StatusFail:
-		return nil, fmt.Errorf("failed to get implementations: %s", out.Message)
-	case api_types.StatusError:
-		return nil, fmt.Errorf("error getting implementations (%s): %v", out.Message, out.Error)
+	return &out.Data, nil
+}
+
+// Subscribe subscribes a client to an outreach job (requires outreach client key)
+func (c *Client) Subscribe(ctx context.Context, clientKey string, req *SubscribeRequest) (*SubscribeResponse, error) {
+	path := "/api/internal/outreach/subscriptions"
+
+	var out SuccessResponse[SubscribeResponse]
+	if err := c.NewRequest(ctx, http.MethodPost, path, req, &out).WithOutreachClientKey(clientKey).doJSON(); err != nil {
+		return nil, err
 	}
 
 	return &out.Data, nil
 }
 
-// GetOutreachStatus retrieves the current status of the outreach service
-func (c *Client) GetOutreachStatus(ctx context.Context, creds OutreachCredentials) (*OutreachStatusResponse, error) {
-	path := "/api/outreach/status"
+// Unsubscribe removes a client's subscription from an outreach job (requires outreach client key)
+func (c *Client) Unsubscribe(ctx context.Context, clientKey string, req *UnsubscribeRequest) error {
+	path := "/api/internal/outreach/subscriptions"
 
-	var out ApiResponse[OutreachStatusResponse]
-	if err := c.NewRequest(ctx, http.MethodGet, path, nil, &out).WithClientCredentials(creds.ClientId, creds.ClientSecret).doJSON(); err != nil {
-		return nil, err
-	}
-
-	// Check for success
-	switch out.Status {
-	case api_types.StatusFail:
-		return nil, fmt.Errorf("failed to get outreach status: %s", out.Message)
-	case api_types.StatusError:
-		return nil, fmt.Errorf("error getting outreach status (%s): %v", out.Message, out.Error)
-	}
-
-	return &out.Data, nil
+	return c.NewRequest(ctx, http.MethodDelete, path, req, nil).WithOutreachClientKey(clientKey).doJSON()
 }
