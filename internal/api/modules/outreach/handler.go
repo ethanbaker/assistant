@@ -28,12 +28,12 @@ func NewHandler(cfg HandlerConfig) *Handler {
 
 // CreateJob handles POST /outreach/jobs.
 func (h *Handler) CreateJob(c *gin.Context) {
-	if !h.authorizeAdmin(c.GetHeader("X-Admin-Key")) {
+	if !h.authorizeAdmin(c.GetHeader("X-API-KEY")) {
 		c.JSON(sdk.NewUnauthorized("invalid api key").AsGinResponse())
 		return
 	}
 
-	var req CreateJobRequest
+	var req sdk.CreateJobRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(sdk.NewBadRequest("Could not parse request body").WithDetails(err.Error()).AsGinResponse())
 		return
@@ -55,17 +55,17 @@ func (h *Handler) CreateJob(c *gin.Context) {
 		return
 	}
 
-	c.JSON(sdk.NewSuccess(CreateJobResponse{JobID: int(job.ID)}).AsGinResponse())
+	c.JSON(sdk.NewSuccess(sdk.CreateJobResponse{JobID: int(job.ID)}).AsGinResponse())
 }
 
 // RegisterClient handles POST /outreach/clients.
 func (h *Handler) RegisterClient(c *gin.Context) {
-	if !h.authorizeAdmin(c.GetHeader("X-Admin-Key")) {
+	if !h.authorizeAdmin(c.GetHeader("X-API-KEY")) {
 		c.JSON(sdk.NewUnauthorized("invalid admin key").AsGinResponse())
 		return
 	}
 
-	var req RegisterClientRequest
+	var req sdk.RegisterClientRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(sdk.NewBadRequest("Could not parse request body").WithDetails(err.Error()).AsGinResponse())
 		return
@@ -77,7 +77,7 @@ func (h *Handler) RegisterClient(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, RegisterClientResponse{
+	c.JSON(http.StatusCreated, sdk.RegisterClientResponse{
 		ClientID: int(client.ID),
 		APIKey:   client.ApiKey,
 	})
@@ -90,7 +90,7 @@ func (h *Handler) Subscribe(c *gin.Context) {
 		return
 	}
 
-	var req SubscribeRequest
+	var req sdk.SubscribeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(sdk.NewBadRequest("Could not parse request body").WithDetails(err.Error()).AsGinResponse())
 		return
@@ -102,7 +102,7 @@ func (h *Handler) Subscribe(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, SubscribeResponse{SubscriptionID: int(subscription.ID)})
+	c.JSON(http.StatusCreated, sdk.SubscribeResponse{SubscriptionID: int(subscription.ID)})
 }
 
 // Unsubscribe handles DELETE /outreach/subscriptions.
@@ -112,7 +112,7 @@ func (h *Handler) Unsubscribe(c *gin.Context) {
 		return
 	}
 
-	var req UnsubscribeRequest
+	var req sdk.UnsubscribeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(sdk.NewBadRequest("Could not parse request body").WithDetails(err.Error()).AsGinResponse())
 		return

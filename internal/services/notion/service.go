@@ -2,7 +2,31 @@ package notion
 
 import (
 	"context"
+	"time"
 )
+
+// ScheduleItem represents a schedule item from the Notion service
+type ScheduleItem struct {
+	ID       string     `json:"id"`
+	Title    string     `json:"title"`
+	Start    *time.Time `json:"start,omitempty"`
+	End      *time.Time `json:"end,omitempty"`
+	Timespan *string    `json:"timespan,omitempty"`
+	Project  *string    `json:"project,omitempty"`
+}
+
+// RecurringTask represents a recurring task from the Notion task service
+type RecurringTask struct {
+	ID             string  `json:"id"`
+	Title          string  `json:"title"`
+	Done           bool    `json:"done"`
+	LastDone       *string `json:"last_done,omitempty"`
+	LastDonePretty *string `json:"last_done_pretty,omitempty"`
+	DueDate        *string `json:"due_date,omitempty"`
+	DueDatePretty  *string `json:"due_date_pretty,omitempty"`
+	Type           *string `json:"type,omitempty"`
+	Connection     *string `json:"connection,omitempty"`
+}
 
 // Task represents a task from the Notion task service
 type Task struct {
@@ -66,7 +90,8 @@ type UpdateTaskArgs struct {
 type TaskService interface {
 	QueryTasks(ctx context.Context, args FetchTasksArgs) ([]Task, error)
 	QueryUpcomingTasks(ctx context.Context) ([]Task, error)
-	QueryRecurringTasks(ctx context.Context) ([]Task, error)
+	QueryRecurringTasks(ctx context.Context) ([]RecurringTask, error)
+	QueryScheduleItems(ctx context.Context) ([]ScheduleItem, error)
 	GetTaskDetails(ctx context.Context, taskID string) (TaskDetails, error)
 	CreateTask(ctx context.Context, args CreateTaskArgs) (Task, error)
 	UpdateTask(ctx context.Context, args UpdateTaskArgs) (Task, error)

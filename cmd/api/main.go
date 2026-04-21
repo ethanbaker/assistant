@@ -19,9 +19,10 @@ import (
 	health_api "github.com/ethanbaker/assistant/internal/api/modules/health"
 	outreach_api "github.com/ethanbaker/assistant/internal/api/modules/outreach"
 	"github.com/ethanbaker/assistant/internal/api/routes"
-	"github.com/ethanbaker/assistant/internal/config"
 	"github.com/ethanbaker/assistant/internal/database"
 	"github.com/ethanbaker/assistant/internal/domain"
+	dailydigest_outreach "github.com/ethanbaker/assistant/internal/outreaches/daily_digest"
+	notionschedule_outreach "github.com/ethanbaker/assistant/internal/outreaches/notion_schedule"
 	"github.com/ethanbaker/assistant/internal/outreaches/test"
 	client_repo "github.com/ethanbaker/assistant/internal/repositories/client"
 	job_repo "github.com/ethanbaker/assistant/internal/repositories/job"
@@ -33,13 +34,10 @@ import (
 	"github.com/ethanbaker/assistant/internal/services/memory"
 	"github.com/ethanbaker/assistant/internal/services/notion"
 	"github.com/ethanbaker/assistant/internal/services/searxng"
+	"github.com/ethanbaker/assistant/pkg/config"
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-yaml"
 )
-
-var outreaches = map[string]outreach_api.HandlerFunc{
-	"example-job": test.TestOutreach,
-}
 
 // Start the API server
 func main() {
@@ -96,6 +94,8 @@ func main() {
 		APIToken:            config.GetenvWithDefault("NOTION_API_TOKEN", ""),
 		TasksDatabaseID:     config.GetenvWithDefault("NOTION_DATABASE_TASKS_ID", ""),
 		RecurringDatabaseID: config.GetenvWithDefault("NOTION_DATABASE_RECURRING_ID", ""),
+		ScheduleDatabaseID:  config.GetenvWithDefault("NOTION_DATABASE_SCHEDULE_ID", ""),
+		Timezone:            config.MustGetenv("TIMEZONE"),
 	})
 	fatalOnErr(err)
 
@@ -182,6 +182,15 @@ func main() {
 	})
 	fatalOnErr(err)
 
+	// 5. Outreaches
+	dailyDigest := dailydigest_outreach.NewDailyDigest(gcalService, notionTaskService)
+	notionSchedule := notionschedule_outreach.NewNotionSchedule(context.Background(), notionTaskService)
+	outreaches := map[string]outreach_api.HandlerFunc{
+		"example-job":     test.TestOutreach,
+		"daily-digest":    dailyDigest.RunDailyDigest,
+		"notion-schedule": notionSchedule.RunNotionSchedule,
+	}
+
 	// 5.1. Api Services
 	agentService := agent_api.NewService(agent_api.ServiceConfig{
 		SessionRepository:   sessionRepo,
@@ -217,6 +226,7 @@ func main() {
 	// 7. Router
 	engine := gin.Default()
 	engine.NoRoute(utils.NoRouteHandler)
+	engine.SetTrustedProxies(nil)
 
 	public := engine.Group("")
 	internal := engine.Group("")

@@ -17,5 +17,5 @@ fi
 
 curl -sS -X POST "${OUTREACH_BASE}/jobs" \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Key: ${ADMIN_API_KEY}" \
+  -H "X-API-KEY: ${ADMIN_API_KEY}" \
   -d "{\"name\":\"${JOB_NAME}\",\"schedule\":${SCHEDULE_JSON},\"handler\":\"${HANDLER}\",\"parameters\":${PARAMETERS_JSON}}"

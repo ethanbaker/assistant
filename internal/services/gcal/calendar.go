@@ -282,6 +282,7 @@ func (cs *calendarServiceImpl) GetEventsForTimeRange(ctx context.Context, start,
 			TimeMin(start.Format(time.RFC3339)).
 			TimeMax(end.Format(time.RFC3339)).
 			SingleEvents(true).
+			EventTypes("default").
 			OrderBy("startTime")
 
 		evs, err := call.Do()

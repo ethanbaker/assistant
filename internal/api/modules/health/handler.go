@@ -2,7 +2,7 @@ package health
 
 import (
 	"github.com/ethanbaker/assistant/internal/api/routes"
-	"github.com/ethanbaker/assistant/internal/logger"
+	"github.com/ethanbaker/assistant/pkg/logger"
 	"github.com/ethanbaker/assistant/pkg/sdk"
 	"github.com/gin-gonic/gin"
 )

@@ -11,17 +11,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethanbaker/assistant/internal/config"
 	"github.com/ethanbaker/assistant/internal/domain"
-	"github.com/ethanbaker/assistant/internal/logger"
 	clientrepo "github.com/ethanbaker/assistant/internal/repositories/client"
 	jobrepo "github.com/ethanbaker/assistant/internal/repositories/job"
 	jobexecutionrepo "github.com/ethanbaker/assistant/internal/repositories/jobexecution"
 	jobsubrepo "github.com/ethanbaker/assistant/internal/repositories/jobsubscription"
+	"github.com/ethanbaker/assistant/pkg/config"
+	"github.com/ethanbaker/assistant/pkg/logger"
+	"github.com/ethanbaker/assistant/pkg/sdk"
 )
 
+type OutreachResponse struct {
+	Content string
+	Data    any
+}
+
 // HandlerFunc executes the configured job handler using serialized parameters.
-type HandlerFunc func(ctx context.Context, params json.RawMessage) (string, error)
+type HandlerFunc func(ctx context.Context, params json.RawMessage) (*OutreachResponse, error)
 
 // scheduleRunner interface contains a function that waits until it's due to run
 type scheduleRunner interface {
@@ -303,7 +309,7 @@ func (e *Executor) execute(ctx context.Context, run *runningJob) {
 func (e *Executor) processJob(ctx context.Context, job *domain.Job) {
 	// Create a job execution model
 	execution := &domain.JobExecution{
-		Status: domain.Running,
+		Status: domain.JobRunning,
 		JobId:  int(job.ID),
 	}
 
@@ -330,23 +336,36 @@ func (e *Executor) processJob(ctx context.Context, job *domain.Job) {
 		return
 	}
 
-	// Update the execution record
-	execution.Output = output
-	if err := e.executionRepository.Update(execution); err != nil {
-		logger.Warnf("Failed to persist job execution output for job %d: %v", job.ID, err)
+	// Update the execution record depending on output
+	if output == nil {
+		execution.Status = domain.JobCanceled
+		if err := e.executionRepository.Update(execution); err != nil {
+			logger.Warnf("Failed to persist job execution output for job %d: %v", job.ID, err)
+		}
+		return
+	}
+
+	v, err := json.Marshal(output)
+	if err != nil {
+		logger.Warnf("Failed to marshal output")
+	} else {
+		execution.Output = string(v)
+		if err := e.executionRepository.Update(execution); err != nil {
+			logger.Warnf("Failed to persist job execution output for job %d: %v", job.ID, err)
+		}
 	}
 
 	// Find subscriptions to the job
 	subs, err := e.subscriptionRepository.FindActiveByJobId(int(job.ID))
 	if err != nil {
-		execution.Status = domain.SendingFailed
+		execution.Status = domain.JobSendingFailed
 		execution.Error = fmt.Sprintf("failed to load subscriptions: %v", err)
 		_ = e.executionRepository.Update(execution)
 		return
 	}
 
 	if len(subs) == 0 {
-		execution.Status = domain.SendingFailed
+		execution.Status = domain.JobSendingFailed
 		execution.Error = "no active subscriptions"
 		_ = e.executionRepository.Update(execution)
 		return
@@ -374,15 +393,15 @@ func (e *Executor) processJob(ctx context.Context, job *domain.Job) {
 		// Find client from subscription
 		client, clientErr := e.clientRepository.FindById(sub.ClientId)
 		if clientErr != nil || client == nil {
-			execution.Status = domain.SendingFailed
+			execution.Status = domain.JobSendingFailed
 			execution.Error = fmt.Sprintf("failed to load client %d: %v", sub.ClientId, clientErr)
 			_ = e.executionRepository.Update(execution)
 			continue
 		}
 
-		// Send execution to webhook
-		if sendErr := e.sendWebhook(ctx, client.WebhookUrl, execution); sendErr != nil {
-			execution.Status = domain.SendingFailed
+		// Send execution to webhook if output is not nil
+		if sendErr := e.sendWebhook(ctx, client.WebhookUrl, execution, job.Name, output); sendErr != nil {
+			execution.Status = domain.JobSendingFailed
 			execution.Error = sendErr.Error()
 			_ = e.executionRepository.Update(execution)
 			continue
@@ -393,7 +412,7 @@ func (e *Executor) processJob(ctx context.Context, job *domain.Job) {
 		_ = e.subscriptionRepository.Update(sub)
 
 		execution.ClientId = sub.ClientId
-		execution.Status = domain.SuccessfullySent
+		execution.Status = domain.JobSuccessfullySent
 		execution.Error = ""
 		_ = e.executionRepository.Update(execution)
 		return
@@ -401,11 +420,14 @@ func (e *Executor) processJob(ctx context.Context, job *domain.Job) {
 }
 
 // sendWebhook is a helper method to send a webhook to a client
-func (e *Executor) sendWebhook(ctx context.Context, webhookURL string, execution *domain.JobExecution) error {
+func (e *Executor) sendWebhook(ctx context.Context, webhookURL string, execution *domain.JobExecution, jobName string, output *OutreachResponse) error {
 	// Create payload from job execution record
-	payload := map[string]any{
-		"job_execution_ids": []int{int(execution.ID)},
-		"execution":         execution,
+	payload := sdk.WebhookPayload{
+		ID:      execution.ID,
+		JobID:   execution.JobId,
+		JobName: jobName,
+		Content: output.Content,
+		Data:    output.Data,
 	}
 
 	body, err := json.Marshal(payload)

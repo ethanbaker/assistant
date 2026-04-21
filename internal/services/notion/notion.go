@@ -15,6 +15,8 @@ type NotionTaskServiceConfig struct {
 	APIToken            string
 	TasksDatabaseID     string
 	RecurringDatabaseID string
+	ScheduleDatabaseID  string
+	Timezone            string
 }
 
 // NotionTaskService provides Notion API access for task management
@@ -22,6 +24,8 @@ type NotionTaskService struct {
 	client              *notionapi.Client
 	tasksDatabaseID     string
 	recurringDatabaseID string
+	scheduleDatabaseID  string
+	tz                  *time.Location
 }
 
 // NewNotionTaskService creates a new NotionTaskService
@@ -35,15 +39,28 @@ func NewNotionTaskService(cfg NotionTaskServiceConfig) (*NotionTaskService, erro
 	if cfg.RecurringDatabaseID == "" {
 		return nil, errors.New("RecurringDatabaseID is required")
 	}
+	if cfg.ScheduleDatabaseID == "" {
+		return nil, errors.New("ScheduleDatabaseID is required")
+	}
+	if cfg.Timezone == "" {
+		return nil, errors.New("Timezone is required")
+	}
 
 	client := notionapi.NewClient(cfg.APIToken, notionapi.WithHTTPClient(&http.Client{
 		Timeout: 20 * time.Second,
 	}))
 
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		return nil, err
+	}
+
 	return &NotionTaskService{
 		client:              client,
 		tasksDatabaseID:     cfg.TasksDatabaseID,
 		recurringDatabaseID: cfg.RecurringDatabaseID,
+		scheduleDatabaseID:  cfg.ScheduleDatabaseID,
+		tz:                  loc,
 	}, nil
 }
 
@@ -76,7 +93,7 @@ func (ns *NotionTaskService) QueryUpcomingTasks(ctx context.Context) ([]Task, er
 }
 
 // QueryRecurringTasks queries the recurring tasks database with provided filters
-func (ns *NotionTaskService) QueryRecurringTasks(ctx context.Context) ([]Task, error) {
+func (ns *NotionTaskService) QueryRecurringTasks(ctx context.Context) ([]RecurringTask, error) {
 	if ns.recurringDatabaseID == "" {
 		return nil, fmt.Errorf("recurring tasks database ID not configured")
 	}
@@ -86,7 +103,21 @@ func (ns *NotionTaskService) QueryRecurringTasks(ctx context.Context) ([]Task, e
 		return nil, fmt.Errorf("failed to query recurring tasks: %w", err)
 	}
 
-	return ns.pagesToTasks(response.Results), nil
+	return ns.pagesToRecurringTasks(response.Results), nil
+}
+
+// QueryScheduleItems queries the schedule items for today
+func (ns *NotionTaskService) QueryScheduleItems(ctx context.Context) ([]ScheduleItem, error) {
+	if ns.scheduleDatabaseID == "" {
+		return nil, fmt.Errorf("schedule items database ID not configured")
+	}
+
+	response, err := ns.client.QueryDatabase(ctx, ns.scheduleDatabaseID, ns.buildScheduleItemsQuery())
+	if err != nil {
+		return nil, fmt.Errorf("failed to query schedule items: %w", err)
+	}
+
+	return ns.pagesToScheduleItems(response.Results), nil
 }
 
 // GetTaskDetails retrieves detailed information about a specific task

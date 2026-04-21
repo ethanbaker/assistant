@@ -5,9 +5,9 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ethanbaker/assistant/internal/config"
 	"github.com/ethanbaker/assistant/internal/prompts"
 	"github.com/ethanbaker/assistant/internal/services/notion"
+	"github.com/ethanbaker/assistant/pkg/config"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
 

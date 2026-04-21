@@ -14,7 +14,7 @@ func (ns *NotionTaskService) buildFetchTasksQuery(args FetchTasksArgs) *notionap
 		Property: COLUMN_CANCELED,
 		DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 			Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-				Equals: pointer(false),
+				Equals: new(false),
 			},
 		},
 	})
@@ -116,7 +116,7 @@ func (ns *NotionTaskService) buildUpcomingTasksQuery() *notionapi.DatabaseQuery 
 					Property: COLUMN_COMPLETE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -126,7 +126,7 @@ func (ns *NotionTaskService) buildUpcomingTasksQuery() *notionapi.DatabaseQuery 
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Formula: &notionapi.FormulaDatabaseQueryFilter{
 							Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-								Equals: pointer(false),
+								Equals: new(false),
 							},
 						},
 					},
@@ -139,7 +139,7 @@ func (ns *NotionTaskService) buildUpcomingTasksQuery() *notionapi.DatabaseQuery 
 							DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 								Formula: &notionapi.FormulaDatabaseQueryFilter{
 									Number: &notionapi.NumberDatabaseQueryFilter{
-										GreaterThanOrEqualTo: pointer(5),
+										GreaterThanOrEqualTo: new(5),
 									},
 								},
 							},
@@ -157,7 +157,7 @@ func (ns *NotionTaskService) buildUpcomingTasksQuery() *notionapi.DatabaseQuery 
 							Property: COLUMN_DATE,
 							DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 								Date: &notionapi.DatePropertyFilter{
-									OnOrBefore: pointer(time.Now()),
+									OnOrBefore: new(time.Now()),
 								},
 							},
 						},
@@ -185,7 +185,7 @@ func (ns *NotionTaskService) buildRecurringTasksQuery() *notionapi.DatabaseQuery
 					Property: RECURRING_COLUMN_ACTIVE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(true),
+							Equals: new(true),
 						},
 					},
 				},
@@ -195,7 +195,7 @@ func (ns *NotionTaskService) buildRecurringTasksQuery() *notionapi.DatabaseQuery
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Formula: &notionapi.FormulaDatabaseQueryFilter{
 							Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-								Equals: pointer(true),
+								Equals: new(true),
 							},
 						},
 					},
@@ -205,7 +205,7 @@ func (ns *NotionTaskService) buildRecurringTasksQuery() *notionapi.DatabaseQuery
 					Property: RECURRING_COLUMN_DONE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -230,7 +230,7 @@ func (ns *NotionTaskService) buildOverdueTasksQuery() *notionapi.DatabaseQuery {
 					Property: COLUMN_COMPLETE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -238,7 +238,7 @@ func (ns *NotionTaskService) buildOverdueTasksQuery() *notionapi.DatabaseQuery {
 					Property: COLUMN_CANCELED,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -246,7 +246,7 @@ func (ns *NotionTaskService) buildOverdueTasksQuery() *notionapi.DatabaseQuery {
 					Property: COLUMN_DATE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Date: &notionapi.DatePropertyFilter{
-							Before: pointer(time.Now()),
+							Before: new(time.Now()),
 						},
 					},
 				},
@@ -270,7 +270,7 @@ func (ns *NotionTaskService) buildCriticalTasksQuery() *notionapi.DatabaseQuery 
 					Property: COLUMN_COMPLETE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -302,7 +302,7 @@ func (ns *NotionTaskService) buildUrgentTasksQuery() *notionapi.DatabaseQuery {
 					Property: COLUMN_COMPLETE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -358,7 +358,7 @@ func (ns *NotionTaskService) buildQuickWinsQuery() *notionapi.DatabaseQuery {
 					Property: COLUMN_COMPLETE,
 					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
 						Checkbox: &notionapi.CheckboxDatabaseQueryFilter{
-							Equals: pointer(false),
+							Equals: new(false),
 						},
 					},
 				},
@@ -380,6 +380,42 @@ func (ns *NotionTaskService) buildQuickWinsQuery() *notionapi.DatabaseQuery {
 			{
 				Property:  COLUMN_PRIORITY,
 				Direction: notionapi.SortDirDesc,
+			},
+		},
+	}
+}
+
+func (ns *NotionTaskService) buildScheduleItemsQuery() *notionapi.DatabaseQuery {
+	now := time.Now().In(ns.tz)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, ns.tz)
+	tomorrow := today.Add(24 * time.Hour)
+
+	return &notionapi.DatabaseQuery{
+		Filter: &notionapi.DatabaseQueryFilter{
+			And: []notionapi.DatabaseQueryFilter{
+				{
+					Property: "Date",
+					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
+						Date: &notionapi.DatePropertyFilter{
+							OnOrAfter: &today,
+						},
+					},
+				},
+				{
+					Property: "Date",
+					DatabaseQueryPropertyFilter: notionapi.DatabaseQueryPropertyFilter{
+						Date: &notionapi.DatePropertyFilter{
+							OnOrBefore: &tomorrow,
+						},
+					},
+				},
+			},
+		},
+		// Sort by ascending date
+		Sorts: []notionapi.DatabaseQuerySort{
+			{
+				Property:  "Date",
+				Direction: notionapi.SortDirAsc,
 			},
 		},
 	}

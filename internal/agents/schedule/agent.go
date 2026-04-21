@@ -7,9 +7,9 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/ethanbaker/assistant/internal/config"
 	"github.com/ethanbaker/assistant/internal/prompts"
 	"github.com/ethanbaker/assistant/internal/services/gcal"
+	"github.com/ethanbaker/assistant/pkg/config"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
 

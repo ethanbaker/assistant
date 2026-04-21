@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethanbaker/assistant/internal/logger"
 	gcal_service "github.com/ethanbaker/assistant/internal/services/gcal"
+	"github.com/ethanbaker/assistant/pkg/logger"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 	"github.com/openai/openai-go/v2/packages/param"
 )
@@ -18,7 +18,6 @@ func (sa *ScheduleAgent) registerTools() {
 		sa.createSearchEventsTools(),
 		sa.createGetTodayEventsTools(),
 		sa.createGetWeekEventsTools(),
-		sa.createGetMonthEventsTools(),
 		sa.createGetSpecificDayEventsTools(),
 		sa.createCreateEventTools(),
 		sa.createUpdateEventTools(),
@@ -103,7 +102,7 @@ func (sa *ScheduleAgent) createGetTodayEventsTools() agents.FunctionTool {
 
 	return agents.FunctionTool{
 		Name:        "get_today_events",
-		Description: "Get all calendar events for today",
+		Description: "Get the user's schedule for today",
 		ParamsJSONSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -130,7 +129,7 @@ func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
 
 	return agents.FunctionTool{
 		Name:        "get_week_events",
-		Description: "Get all calendar events for this week",
+		Description: "Get the user's schedule for the week",
 		ParamsJSONSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -151,40 +150,13 @@ func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
 	}
 }
 
-// createGetMonthEventsTools creates the get this month's events tool
-func (sa *ScheduleAgent) createGetMonthEventsTools() agents.FunctionTool {
-	calendarNames := sa.calendarService.GetCalendarNamesList()
-
-	return agents.FunctionTool{
-		Name:        "get_month_events",
-		Description: "Get all calendar events for this month",
-		ParamsJSONSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"calendar_name": map[string]any{
-					"type":        []string{"string", "null"},
-					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
-				},
-			},
-			"required":             []string{"calendar_name"},
-			"additionalProperties": false,
-		},
-		StrictJSONSchema: param.NewOpt(true),
-		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
-			return sa.handleGetMonthEvents(ctx, arguments)
-		},
-		IsEnabled: agents.FunctionToolEnabled(),
-	}
-}
-
 // createGetSpecificDayEventsTools creates the get events for specific day tool
 func (sa *ScheduleAgent) createGetSpecificDayEventsTools() agents.FunctionTool {
 	calendarNames := sa.calendarService.GetCalendarNamesList()
 
 	return agents.FunctionTool{
 		Name:        "get_specific_day_events",
-		Description: "Get all calendar events for a specific date",
+		Description: "Get the user's schedule for a specific date",
 		ParamsJSONSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -418,38 +390,6 @@ func (sa *ScheduleAgent) handleGetWeekEvents(ctx context.Context, arguments stri
 	events, err := sa.calendarService.GetWeekEvents(ctx, calendarName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get week events: %w", err)
-	}
-
-	return formatEventsResponse(events), nil
-}
-
-// handleGetMonthEvents processes the get month events tool invocation
-func (sa *ScheduleAgent) handleGetMonthEvents(ctx context.Context, arguments string) (any, error) {
-	if sa.ShouldDryRun(ctx) {
-		return fmt.Sprintf("DRY RUN: Would get this month's calendar events with args: %s", arguments), nil
-	}
-
-	arguments = normalizeArguments(arguments)
-
-	// Parse arguments
-	var args GetEventsArgs
-	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return nil, fmt.Errorf("failed to parse arguments: %w", err)
-	}
-
-	calendarName := refWithDefault(args.CalendarName, "")
-	if !sa.calendarService.IsValidCalendarName(calendarName) {
-		return nil, fmt.Errorf("invalid calendar name: %s", calendarName)
-	}
-
-	// Get events for this month
-	now := time.Now()
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	end := start.AddDate(0, 1, 0) // Start of next month
-
-	events, err := sa.calendarService.GetEventsForTimeRange(ctx, start, end, calendarName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get month events: %w", err)
 	}
 
 	return formatEventsResponse(events), nil

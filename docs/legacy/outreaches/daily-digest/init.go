@@ -11,7 +11,7 @@ import (
 
 	ics "github.com/arran4/golang-ical"
 	notionapi "github.com/dstotijn/go-notion"
-	"github.com/ethanbaker/assistant/internal/config"
+	"github.com/ethanbaker/assistant/pkg/config"
 	"gopkg.in/yaml.v3"
 )
 

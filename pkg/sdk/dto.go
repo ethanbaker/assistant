@@ -19,7 +19,7 @@ type SuccessResponse[T any] struct {
 
 // Return the ErrorResponse in a format to provide to Gin Context
 func (r SuccessResponse[T]) AsGinResponse() (int, any) {
-	return r.Code, r.Data
+	return r.Code, r
 }
 
 // Error response
@@ -227,64 +227,53 @@ type Item struct {
 	SessionID uuid.UUID `json:"session_id"`
 }
 
+/** Agent Module DTOs */
+
+// AttachJobExecutionContextRequest defines the payload for adding outreach execution context to a session
+type AttachJobExecutionContextRequest struct {
+	JobExecutionIDs []int `json:"job_execution_ids" binding:"required"`
+}
+
 /** Outreach Module DTOs */
 
-// OutreachCredentials represents credentials for outreach implementations
-type OutreachCredentials struct {
-	ClientId     string `json:"client_id" binding:"required"`     // Unique identifier for the implementation
-	ClientSecret string `json:"client_secret" binding:"required"` // Secret for signing requests
+// CreateJobRequest is the request payload for creating an outreach job
+type CreateJobRequest struct {
+	Name       string          `json:"name" binding:"required"`
+	Schedule   json.RawMessage `json:"schedule" binding:"required"`
+	Handler    string          `json:"handler" binding:"required"`
+	Parameters json.RawMessage `json:"parameters"`
+	Active     *bool           `json:"active"`
 }
 
-// OutreachRegisterRequest represents the request to register an implementation
-type OutreachRegisterRequest struct {
-	CallbackUrl  string `json:"callback_url" binding:"required"`  // HTTP endpoint where outreach requests will be sent
-	ClientId     string `json:"client_id" binding:"required"`     // Unique identifier for the implementation
-	ClientSecret string `json:"client_secret" binding:"required"` // Secret for signing requests
+// CreateJobResponse is returned after successful job creation
+type CreateJobResponse struct {
+	JobID int `json:"job_id"`
 }
 
-// OutreachRegisterResponse represents the successful registration response
-type OutreachRegisterResponse struct {
-	ClientId string `json:"client_id"` // The registered client ID
+// RegisterClientRequest is the request payload for registering an outreach client
+type RegisterClientRequest struct {
+	Name       string `json:"name" binding:"required"`
+	WebhookURL string `json:"webhook_url" binding:"required"`
 }
 
-// OutreachUnregisterRequest represents the request to unregister an implementation
-type OutreachUnregisterRequest struct {
-	ClientId string `json:"client_id" binding:"required"` // Client ID to unregister
+// RegisterClientResponse is returned after successful client registration
+type RegisterClientResponse struct {
+	ClientID int    `json:"client_id"`
+	APIKey   string `json:"api_key"`
 }
 
-// OutreachImplementation represents an implementation in API responses
-type OutreachImplementation struct {
-	ClientId    string `json:"client_id"`    // Unique identifier for the implementation
-	CallbackUrl string `json:"callback_url"` // HTTP endpoint where outreach requests will be sent
+// SubscribeRequest is the request payload for subscribing a client to a job
+type SubscribeRequest struct {
+	JobName  string `json:"job_name" binding:"required"`
+	Priority int    `json:"priority" binding:"required"`
 }
 
-// OutreachListImplementationsResponse represents the response for listing implementations
-type OutreachListImplementationsResponse struct {
-	Implementations []OutreachImplementation `json:"implementations"`
-	Count           int                      `json:"count"`
+// SubscribeResponse is returned after successful subscription creation
+type SubscribeResponse struct {
+	SubscriptionID int `json:"subscription_id"`
 }
 
-// OutreachTaskStatus represents the status of task operations
-type OutreachTaskStatus struct {
-	Loaded int `json:"loaded"` // Number of tasks loaded
-}
-
-// OutreachStatusResponse represents the overall status of the outreach service
-type OutreachStatusResponse struct {
-	Status               string             `json:"status"`                // Overall service status
-	TasksStatus          OutreachTaskStatus `json:"tasks_status"`          // Task statistics
-	ImplementationsCount int                `json:"implementations_count"` // Number of registered implementations
-	ManagerRunning       bool               `json:"manager_running"`       // Whether the manager is running
-}
-
-// OutreachResponseRequest sent by the outreach service to an implementation
-// This represents the payload that will be sent to registered implementations
-type OutreachRequest struct {
-	Id     string         `json:"id"`               // Idempotency ID for the request
-	Author string         `json:"author,omitempty"` // Implementation author of the request
-	Key    string         `json:"key"`              // Name of the outreach task being performed
-	Params map[string]any `json:"params"`           // Task parameters from the original task
-
-	Content string `json:"content"`        // Content to be sent out (generated by the task)
-	Data    any    `json:"data,omitempty"` // Extra data for the request
+// UnsubscribeRequest is the request payload for unsubscribing a client from a job
+type UnsubscribeRequest struct {
+	JobName string `json:"job_name" binding:"required"`
 }

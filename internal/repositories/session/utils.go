@@ -2,7 +2,7 @@ package session
 
 import (
 	"github.com/ethanbaker/assistant/internal/domain"
-	"github.com/ethanbaker/assistant/internal/logger"
+	"github.com/ethanbaker/assistant/pkg/logger"
 	"github.com/openai/openai-go/v2/shared/constant"
 )
 

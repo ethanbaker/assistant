@@ -346,8 +346,7 @@ func (ta *TaskAgent) handleGetTodaysTasks(ctx context.Context, arguments string)
 		return nil, err
 	}
 
-	combined := append(upcomingTasks, recurringTasks...)
-	return formatTasksResponse(combined), nil
+	return formatTasksAndRecurringTasksResponse(upcomingTasks, recurringTasks), nil
 }
 
 // handleGetTaskDetails processes the get task details tool invocation
@@ -385,7 +384,7 @@ func (ta *TaskAgent) handleGetRecurringTasks(ctx context.Context, arguments stri
 	if err != nil {
 		return nil, err
 	}
-	return formatTasksResponse(tasks), nil
+	return formatRecurringTasksResponse(tasks), nil
 }
 
 // handleCreateNewTask processes the create new task tool invocation
@@ -523,6 +522,20 @@ func formatTasksResponse(tasks []notion_service.Task) map[string]any {
 	return out
 }
 
-func pointer[T any](value T) *T {
-	return &value
+// formatRecurringTasksResponse formats a slice of recurring tasks for tool response; adds message when empty
+func formatRecurringTasksResponse(tasks []notion_service.RecurringTask) map[string]any {
+	out := map[string]any{"recurring_tasks": tasks}
+	if len(tasks) == 0 {
+		out["message"] = "No tasks found"
+	}
+	return out
+}
+
+// formatTasksAndRecurringTasksResponse formats a slice of tasks and recurring tasks for tool response
+func formatTasksAndRecurringTasksResponse(tasks []notion_service.Task, recurringTasks []notion_service.RecurringTask) map[string]any {
+	out := map[string]any{"recurring_tasks": tasks, "tasks": recurringTasks}
+	if len(tasks) == 0 && len(recurringTasks) == 0 {
+		out["message"] = "No tasks found"
+	}
+	return out
 }

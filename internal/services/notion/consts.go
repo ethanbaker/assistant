@@ -24,10 +24,20 @@ const (
 	COLUMN_RANK     = "Rank"
 
 	// Recurring Task Database Column Names
-	RECURRING_COLUMN_ACTIVE   = "Active"
-	RECURRING_COLUMN_UPCOMING = "Upcoming"
-	RECURRING_COLUMN_DONE     = "Done"
-	RECURRING_COLUMN_TITLE    = "Name"
+	RECURRING_COLUMN_ACTIVE     = "Active"
+	RECURRING_COLUMN_UPCOMING   = "Upcoming - Offset"
+	RECURRING_COLUMN_DONE       = "Done"
+	RECURRING_COLUMN_TITLE      = "Name"
+	RECURRING_COLUMN_LAST_DONE  = "Last Done"
+	RECURRING_COLUMN_DATE       = "Due Date"
+	RECURRING_COLUMN_TYPE       = "Type"
+	RECURRING_COLUMN_CONNECTION = "Connection Label"
+
+	// Schedule Item Database Column Names
+	SCHEDULE_COLUMN_TITLE    = "Name"
+	SCHEDULE_COLUMN_DATE     = "Date"
+	SCHEDULE_COLUMN_TIMESPAN = "Timespan"
+	SCHEDULE_COLUMN_PROJECT  = "Project Label"
 
 	// Date formats
 	DATE_FORMAT        = "2006-01-02"

@@ -6,11 +6,12 @@ import "gorm.io/gorm"
 type ExecutionStatus string
 
 const (
-	Pending          ExecutionStatus = "PENDING"
-	Running          ExecutionStatus = "RUNNING"
-	JobFailed        ExecutionStatus = "JOB_FAILED"
-	SendingFailed    ExecutionStatus = "SEND_FAILED"
-	SuccessfullySent ExecutionStatus = "SUCCESS"
+	JobPending          ExecutionStatus = "PENDING"
+	JobRunning          ExecutionStatus = "RUNNING"
+	JobFailed           ExecutionStatus = "JOB_FAILED"
+	JobSendingFailed    ExecutionStatus = "SEND_FAILED"
+	JobSuccessfullySent ExecutionStatus = "SUCCESS"
+	JobCanceled         ExecutionStatus = "CANCELED"
 )
 
 // JobExecution stores the output and delivery status for a single job run.

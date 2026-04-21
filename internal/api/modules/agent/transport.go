@@ -12,8 +12,3 @@ type SessionTranscript struct {
 	Data      string    `json:"data"`
 	CreatedAt time.Time `json:"created_at"`
 }
-
-// AttachJobExecutionContextRequest defines payload for adding outreach execution context.
-type AttachJobExecutionContextRequest struct {
-	JobExecutionIDs []int `json:"job_execution_ids" binding:"required"`
-}

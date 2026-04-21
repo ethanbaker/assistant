@@ -8,7 +8,7 @@ import (
 	"time"
 
 	notionapi "github.com/dstotijn/go-notion"
-	"github.com/ethanbaker/assistant/internal/config"
+	"github.com/ethanbaker/assistant/pkg/config"
 )
 
 /* ---- GLOBALS ---- */

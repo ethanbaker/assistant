@@ -15,5 +15,5 @@ fi
 
 curl -sS -X POST "${OUTREACH_BASE}/clients" \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Key: ${ADMIN_API_KEY}" \
+  -H "X-API-KEY: ${ADMIN_API_KEY}" \
   -d "{\"name\":\"${CLIENT_NAME}\",\"webhook_url\":\"${WEBHOOK_URL}\"}"

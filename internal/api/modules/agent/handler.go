@@ -180,7 +180,7 @@ func (h *Handler) AttachJobExecutionContext(c *gin.Context) {
 	}
 
 	// Parse parameters
-	var req AttachJobExecutionContextRequest
+	var req sdk.AttachJobExecutionContextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(sdk.NewBadRequest("Could not parse request body").WithDetails(err.Error()).AsGinResponse())
 		return
