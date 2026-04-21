@@ -3,60 +3,56 @@ package task
 import (
 	"context"
 	"errors"
-	"net/http"
-	"time"
+	"os"
 
-	notionapi "github.com/dstotijn/go-notion"
-	"github.com/ethanbaker/assistant/internal/stores/memory"
-	"github.com/ethanbaker/assistant/internal/stores/session"
-	"github.com/ethanbaker/assistant/pkg/agent"
-	"github.com/ethanbaker/assistant/pkg/utils"
+	"github.com/ethanbaker/assistant/internal/prompts"
+	"github.com/ethanbaker/assistant/internal/services/notion"
+	"github.com/ethanbaker/assistant/pkg/config"
 	"github.com/nlpodyssey/openai-agents-go/agents"
 )
 
+// TaskAgentConfig provided on construct
+type TaskAgentConfig struct {
+	Model             string
+	PromptFile        string
+	NotionTaskService notion.TaskService
+}
+
 // TaskAgent provides task management capabilities
 type TaskAgent struct {
-	agent        *agents.Agent
-	config       *utils.Config
-	memoryStore  *memory.Store
-	sessionStore session.Store
-	basePrompt   string
-	notionClient *notionapi.Client
+	agent      *agents.Agent
+	basePrompt string
+
+	taskService notion.TaskService
 }
 
 // NewTaskAgent creates a new task agent
-func NewTaskAgent(memoryStore *memory.Store, sessionStore session.Store, config *utils.Config) (*TaskAgent, error) {
+func NewTaskAgent(cfg TaskAgentConfig) (*TaskAgent, error) {
+	// Validate config
+	if cfg.Model == "" {
+		return nil, errors.New("Model is required")
+	}
+	if cfg.PromptFile == "" {
+		return nil, errors.New("Prompt file path is required")
+	}
+	if cfg.NotionTaskService == nil {
+		return nil, errors.New("NotionTaskService is required")
+	}
+
 	ta := &TaskAgent{
-		config:       config,
-		memoryStore:  memoryStore,
-		sessionStore: sessionStore,
+		taskService: cfg.NotionTaskService,
 	}
 
-	// Get sysprompt path
-	path := config.Get("TASK_SYSPROMPT_PATH")
-	if path == "" {
-		return nil, errors.New("TASK_SYSPROMPT_PATH not set in environment")
-	}
-
-	// Load instructions from file with fallback to hardcoded version
-	var err error
-	ta.basePrompt, err = utils.LoadPrompt(path)
+	// Load instructions from file
+	data, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
 		return nil, err
 	}
-
-	// Initialize Notion client
-	token := config.Get("NOTION_API_TOKEN")
-	if token == "" {
-		return nil, errors.New("NOTION_API_TOKEN not set in environment")
-	}
-	ta.notionClient = notionapi.NewClient(token, notionapi.WithHTTPClient(&http.Client{
-		Timeout: 20 * time.Second,
-	}))
+	ta.basePrompt = string(data)
 
 	// Create the underlying agent
 	ta.agent = agents.New("task-agent").
-		WithModel(config.Get("MODEL")).
+		WithModel(cfg.Model).
 		WithInstructionsFunc(ta.getPrompt)
 
 	// Register tools
@@ -75,36 +71,13 @@ func (ta *TaskAgent) ID() string {
 	return "task-agent"
 }
 
-// Config returns the agent configuration
-func (ta *TaskAgent) Config() *utils.Config {
-	return ta.config
-}
-
 // ShouldDryRun determines if the agent should run in dry-run mode
 func (ta *TaskAgent) ShouldDryRun(ctx context.Context) bool {
-	return ta.config.GetBool("DRY_RUN")
-}
-
-// getNotionClient returns the Notion client instance
-func (ta *TaskAgent) getNotionClient() *notionapi.Client {
-	return ta.notionClient
+	return config.GetenvValue("DRY_RUN") == "true"
 }
 
 // getPrompt returns the prompt for the agent
 func (ta *TaskAgent) getPrompt(ctx context.Context, a *agents.Agent) (string, error) {
-	now := time.Now()
-
-	builder := agent.NewPromptBuilder(ta.basePrompt)
-	builder.AddContext("Current time: " + now.Format("15:04:05 MST"))
-	builder.AddContext("Today's date: " + now.Format("2006-01-02"))
-
-	// Format the next week's dates
-	weekDates := "Following Week:\n"
-	for i := range 7 {
-		day := now.AddDate(0, 0, i+1)
-		weekDates += "  - " + day.Format("Monday, 2006-01-02") + "\n"
-	}
-	builder.AddContext(weekDates)
-
+	builder := prompts.NewPromptBuilder(ta.basePrompt)
 	return builder.Build(), nil
 }

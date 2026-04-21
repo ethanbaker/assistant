@@ -2,22 +2,25 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/ethanbaker/assistant/pkg/logger"
 )
 
-// respondEphemeral sends a response that is only visible to the user who invoked the command
+// respondEphemeral sends a response visible only to the user who invoked the command.
 func respondEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
 	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{Content: content, Flags: discordgo.MessageFlagsEphemeral},
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
 	})
 }
 
-// deferReply sends a deferred response to acknowledge the interaction
+// deferReply acknowledges the interaction with a deferred response.
 func deferReply(s *discordgo.Session, i *discordgo.InteractionCreate, ephemeral bool) {
 	flags := discordgo.MessageFlags(0)
 	if ephemeral {
@@ -29,9 +32,8 @@ func deferReply(s *discordgo.Session, i *discordgo.InteractionCreate, ephemeral 
 	})
 }
 
-// editFollowup edits the initial response to an interaction with new content
+// editFollowup edits the deferred interaction response. Chunks content if it exceeds Discord limits.
 func editFollowup(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
-	// Chunking handled simply: send first chunk, then followups.
 	chunks := chunkString(content, 1900)
 	if len(chunks) == 0 {
 		chunks = []string{""}
@@ -42,57 +44,53 @@ func editFollowup(s *discordgo.Session, i *discordgo.InteractionCreate, content 
 	}
 }
 
-// reply sends a message to the specified channel, chunking if necessary
+// reply sends a message to a channel, chunking if the content exceeds Discord's 2000-character limit.
 func reply(s *discordgo.Session, channelID, content string) {
-	// Chunk content to Discord limits (2000 chars)
 	for _, chunk := range chunkString(content, 1900) {
 		_, _ = s.ChannelMessageSend(channelID, chunk)
 	}
 }
 
-// replySanitizeHTML sends a message to the specified channel, sanitizing HTML to Discord markdown and chunking if necessary
+// replySanitizeHTML sanitizes HTML to Discord markdown before sending.
 func replySanitizeHTML(s *discordgo.Session, channelID, content string) {
-	sanitized := sanitizeHTMLToDiscordMarkdown(content)
-	reply(s, channelID, sanitized)
+	reply(s, channelID, sanitizeHTMLToDiscordMarkdown(content))
 }
 
-// errorReply sends a formated error message to the specified channel
+// errorReply sends a formatted error message to a channel and logs it.
 func errorReply(s *discordgo.Session, channelID, desc string, errs ...any) {
-	// Create error message
-	errorMsg := ""
+	var errorMsg strings.Builder
 	for _, e := range errs {
-		errorMsg += fmt.Sprintf("\n > %v\n\n", e)
+		fmt.Fprintf(&errorMsg, "\n > %v\n\n", e)
 	}
 
-	// Send to channel
-	output := fmt.Sprintf("Error: %s %s", desc, errorMsg)
+	output := fmt.Sprintf("Error: %s %s", desc, errorMsg.String())
 	reply(s, channelID, output)
-	log.Printf("[DISCORD]: %s", output)
+	logger.Errorf("%s", output)
 }
 
-// chunkString splits a long string into smaller chunks, ensuring no chunk exceeds the specified size
+// chunkString splits a string into chunks no larger than size, splitting on natural boundaries.
 func chunkString(s string, size int) []string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
 	}
+
 	var out []string
 	for len(s) > size {
-		// Try to split on paragraph or sentence boundaries
 		split := findSplit(s[:size])
 		out = append(out, strings.TrimSpace(s[:split]))
 		s = s[split:]
 	}
+
 	if strings.TrimSpace(s) != "" {
 		out = append(out, strings.TrimSpace(s))
 	}
 	return out
 }
 
-// splitRe is a regex to find natural split points in text
 var splitRe = regexp.MustCompile(`(?s)(.*?[\n\r]{2}|.*?[.!?])$`)
 
-// findSplit finds the index of a good split point in the string
+// findSplit finds a good split index (paragraph or sentence boundary).
 func findSplit(s string) int {
 	m := splitRe.FindStringSubmatchIndex(s)
 	if len(m) >= 4 {
@@ -101,58 +99,44 @@ func findSplit(s string) int {
 	return len(s)
 }
 
-// decorateDiscordContext formats the user context for Discord messages to include the user's name for model context
+// decorateDiscordContext prepends Discord user context to a message for the agent.
 func decorateDiscordContext(user *discordgo.User, content string) string {
-	uname := user.Username
+	name := user.Username
 	if user.GlobalName != "" {
-		uname = user.GlobalName
+		name = user.GlobalName
 	}
-	return fmt.Sprintf("[discord user: %s] %s", uname, content)
+	return fmt.Sprintf("[discord user: %s] %s", name, content)
 }
 
-// Define HTML tag to Discord markdown mappings
+// replacements maps HTML tags to their Discord markdown equivalents.
 var replacements = map[string][2]string{
-	// Bold tags
-	"strong": {"**", "**"},
-	"b":      {"**", "**"},
-
-	// Italic tags
-	"em": {"*", "*"},
-	"i":  {"*", "*"},
-
-	// Underline tags (Discord uses __ for underline)
-	"u": {"__", "__"},
-
-	// Strikethrough tags
-	"s":      {"~~", "~~"},
-	"strike": {"~~", "~~"},
-	"del":    {"~~", "~~"},
-
-	// Blockquote tags
+	"strong":     {"**", "**"},
+	"b":          {"**", "**"},
+	"em":         {"*", "*"},
+	"i":          {"*", "*"},
+	"u":          {"__", "__"},
+	"s":          {"~~", "~~"},
+	"strike":     {"~~", "~~"},
+	"del":        {"~~", "~~"},
 	"blockquote": {"\n> ", "\n"},
 }
 
-// sanitizeHTMLToDiscordMarkdown converts HTML elements to Discord markdown
+// sanitizeHTMLToDiscordMarkdown converts HTML elements to Discord markdown.
 func sanitizeHTMLToDiscordMarkdown(content string) string {
 	result := content
 
-	// Process each tag type
 	for tag, markdown := range replacements {
-		// Create case-insensitive regex patterns for opening and closing tags
-		// Use word boundaries to prevent partial matches (e.g., <s> matching <strong>)
 		openPattern := fmt.Sprintf(`(?i)<%s(\s[^>]*|/?)>`, tag)
 		closePattern := fmt.Sprintf(`(?i)</%s>`, tag)
 
-		// Replace opening tags with opening markdown
 		openRe := regexp.MustCompile(openPattern)
 		result = openRe.ReplaceAllString(result, markdown[0])
 
-		// Replace closing tags with closing markdown
 		closeRe := regexp.MustCompile(closePattern)
 		result = closeRe.ReplaceAllString(result, markdown[1])
 	}
 
-	// Handle special cases for code blocks with language specification
+	// Code blocks with language hint
 	preCodeRe := regexp.MustCompile(`(?i)<pre><code[^>]*class="language-([^"]*)"[^>]*>`)
 	result = preCodeRe.ReplaceAllStringFunc(result, func(match string) string {
 		langMatch := regexp.MustCompile(`(?i)class="language-([^"]*)"`)
@@ -160,27 +144,22 @@ func sanitizeHTMLToDiscordMarkdown(content string) string {
 		if len(langMatches) > 1 {
 			return fmt.Sprintf("\n```%s\n", langMatches[1])
 		}
-		return "```\n"
+		return "\n```\n"
 	})
 
-	// Handle preformatted text without language specification
+	// Plain code blocks
 	result = regexp.MustCompile(`(?i)<pre><code>`).ReplaceAllString(result, "\n```\n")
-	result = regexp.MustCompile(`(?i)</code></pre>`).ReplaceAllString(result, "```\n")
+	result = regexp.MustCompile(`(?i)</code></pre>`).ReplaceAllString(result, "\n```\n")
 
-	// Now check inline code tags
+	// Inline code
 	inlineCodeRe := regexp.MustCompile(`(?i)<code>(.*?)</code>`)
 	result = inlineCodeRe.ReplaceAllString(result, "`$1`")
 
-	// Clean up any remaining HTML tags that weren't converted
-	htmlTagRe := regexp.MustCompile(`<[^>]*>`)
-	result = htmlTagRe.ReplaceAllString(result, "")
+	// Strip remaining HTML tags
+	result = regexp.MustCompile(`<[^>]*>`).ReplaceAllString(result, "")
 
-	// Clean up extra whitespace
 	result = strings.TrimSpace(result)
-
-	// Handle escape sequences for Discord markdown
-	result = strings.ReplaceAll(result, "\\n", `
-	`)
+	result = strings.ReplaceAll(result, "\\n", "\n")
 
 	return result
 }

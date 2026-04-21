@@ -34,12 +34,14 @@ vendor/
 config.yaml
 config.json
 resources/config/
+app/*/resources
 
 # IDE/editor specific files
 *.vscode/
 *.idea/
 *.swp
 *.swo
+.github/prompts
 
 # Logs and debug files
 *.log

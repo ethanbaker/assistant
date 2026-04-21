@@ -21,14 +21,21 @@ type RequestBuilder struct {
 	out    any
 
 	// Authentication options
-	apiKey       string
-	clientID     string
-	clientSecret string
+	apiKey            string
+	outreachClientKey string
+	clientID          string
+	clientSecret      string
 }
 
-// WithApiKey sets the API key for the request
+// WithApiKey sets the X-API-KEY header for the request (used for agent and outreach admin endpoints)
 func (rb *RequestBuilder) WithApiKey(apiKey string) *RequestBuilder {
 	rb.apiKey = apiKey
+	return rb
+}
+
+// WithOutreachClientKey sets the X-Client-Key header for outreach client-authenticated requests
+func (rb *RequestBuilder) WithOutreachClientKey(clientKey string) *RequestBuilder {
+	rb.outreachClientKey = clientKey
 	return rb
 }
 
@@ -61,6 +68,9 @@ func (rb *RequestBuilder) doJSON() error {
 	// Set authentication headers
 	if rb.apiKey != "" {
 		req.Header.Set("X-API-KEY", rb.apiKey)
+	}
+	if rb.outreachClientKey != "" {
+		req.Header.Set("X-Client-Key", rb.outreachClientKey)
 	}
 	if rb.clientID != "" && rb.clientSecret != "" {
 		req.Header.Set("X-CLIENT-ID", rb.clientID)

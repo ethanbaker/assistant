@@ -1,0 +1,26 @@
+package domain
+
+import "gorm.io/gorm"
+
+// ExecutionStatus represents the lifecycle status of a job execution.
+type ExecutionStatus string
+
+const (
+	JobPending          ExecutionStatus = "PENDING"
+	JobRunning          ExecutionStatus = "RUNNING"
+	JobFailed           ExecutionStatus = "JOB_FAILED"
+	JobSendingFailed    ExecutionStatus = "SEND_FAILED"
+	JobSuccessfullySent ExecutionStatus = "SUCCESS"
+	JobCanceled         ExecutionStatus = "CANCELED"
+)
+
+// JobExecution stores the output and delivery status for a single job run.
+type JobExecution struct {
+	*gorm.Model
+	Output string
+	Status ExecutionStatus
+	Error  string
+
+	JobId    int
+	ClientId int
+}
