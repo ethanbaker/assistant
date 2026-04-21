@@ -53,14 +53,14 @@ func (r *SearxngToolRegister) RegisterTools(customAgents ...domain.CustomAgent) 
 					"description": "The search query to execute",
 				},
 				"num_results": map[string]any{
-					"type":        "integer",
+					"type":        []string{"integer", "null"},
 					"description": "Maximum number of results to return (optional, defaults to 10)",
 					"minimum":     1,
 					"maximum":     50,
 					"default":     10,
 				},
 				"category": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Search category: 'general', 'news', 'images', or 'map' (optional, defaults to 'general')",
 					"enum":        []string{"general", "news", "images", "map"},
 					"default":     "general",
@@ -88,7 +88,7 @@ func (r *SearxngToolRegister) RegisterTools(customAgents ...domain.CustomAgent) 
 					"description": "The URL to fetch content from",
 				},
 				"extract_main_content": map[string]any{
-					"type":        "boolean",
+					"type":        []string{"boolean", "null"},
 					"description": "Whether to extract only main content (removes ads, navigation, etc.) or full HTML text (optional, defaults to true)",
 					"default":     true,
 				},
@@ -131,12 +131,12 @@ func (r *SearxngToolRegister) RegisterTools(customAgents ...domain.CustomAgent) 
 					"description": "Array of search results to summarize",
 				},
 				"focus_query": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Specific question or topic to focus the summary on (optional)",
 					"default":     "",
 				},
 				"summary_style": map[string]any{
-					"type":        "string",
+					"type":        []string{"string", "null"},
 					"description": "Summary style: 'brief', 'detailed', or 'bullet_points' (optional, defaults to 'detailed')",
 					"enum":        []string{"brief", "detailed", "bullet_points"},
 					"default":     "detailed",

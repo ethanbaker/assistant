@@ -119,6 +119,7 @@ func (r *MemoryToolRegistry) RegisterTools(customAgents ...domain.CustomAgent) {
 			"properties":           map[string]any{},
 			"additionalProperties": false,
 		},
+		StrictJSONSchema: param.NewOpt(true),
 		OnInvokeTool: func(ctx context.Context, arguments string) (any, error) {
 			return r.handleListFacts(ctx, arguments)
 		},

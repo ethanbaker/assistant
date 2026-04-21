@@ -68,6 +68,7 @@ type DeleteEventArgs struct {
 // createSearchEventsTools creates the search events tool
 func (sa *ScheduleAgent) createSearchEventsTools() agents.FunctionTool {
 	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "search_calendar_events",
@@ -82,7 +83,7 @@ func (sa *ScheduleAgent) createSearchEventsTools() agents.FunctionTool {
 				"calendar_name": map[string]any{
 					"type":        []string{"string", "null"},
 					"description": "Calendar name to search in (optional - if omitted, searches all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"additionalProperties": false,
@@ -99,6 +100,7 @@ func (sa *ScheduleAgent) createSearchEventsTools() agents.FunctionTool {
 // createGetTodayEventsTools creates the get today's events tool
 func (sa *ScheduleAgent) createGetTodayEventsTools() agents.FunctionTool {
 	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "get_today_events",
@@ -109,7 +111,7 @@ func (sa *ScheduleAgent) createGetTodayEventsTools() agents.FunctionTool {
 				"calendar_name": map[string]any{
 					"type":        []string{"string", "null"},
 					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"additionalProperties": false,
@@ -126,6 +128,7 @@ func (sa *ScheduleAgent) createGetTodayEventsTools() agents.FunctionTool {
 // createGetWeekEventsTools creates the get this week's events tool
 func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
 	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "get_week_events",
@@ -136,7 +139,7 @@ func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
 				"calendar_name": map[string]any{
 					"type":        []string{"string", "null"},
 					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"required":             []string{"calendar_name"},
@@ -153,6 +156,7 @@ func (sa *ScheduleAgent) createGetWeekEventsTools() agents.FunctionTool {
 // createGetSpecificDayEventsTools creates the get events for specific day tool
 func (sa *ScheduleAgent) createGetSpecificDayEventsTools() agents.FunctionTool {
 	calendarNames := sa.calendarService.GetCalendarNamesList()
+	calendarNamesWithNull := enumWithNull(calendarNames)
 
 	return agents.FunctionTool{
 		Name:        "get_specific_day_events",
@@ -167,7 +171,7 @@ func (sa *ScheduleAgent) createGetSpecificDayEventsTools() agents.FunctionTool {
 				"calendar_name": map[string]any{
 					"type":        []string{"string", "null"},
 					"description": "Calendar name to get events from (optional - if omitted, gets from all calendars)",
-					"enum":        calendarNames,
+					"enum":        calendarNamesWithNull,
 				},
 			},
 			"additionalProperties": false,
@@ -571,4 +575,15 @@ func refWithDefault[T any](v *T, d T) T {
 		return d
 	}
 	return *v
+}
+
+// enumWithNull appends a JSON null option to a string enum.
+func enumWithNull(values []string) []any {
+	enumValues := make([]any, 0, len(values)+1)
+	for _, v := range values {
+		enumValues = append(enumValues, v)
+	}
+	enumValues = append(enumValues, nil)
+
+	return enumValues
 }

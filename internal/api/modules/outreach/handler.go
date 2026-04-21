@@ -1,7 +1,6 @@
 package outreach
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/ethanbaker/assistant/internal/domain"
@@ -77,10 +76,10 @@ func (h *Handler) RegisterClient(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, sdk.RegisterClientResponse{
+	c.JSON(sdk.NewSuccess(sdk.RegisterClientResponse{
 		ClientID: int(client.ID),
 		APIKey:   client.ApiKey,
-	})
+	}).AsGinResponse())
 }
 
 // Subscribe handles POST /outreach/subscriptions.
@@ -102,7 +101,7 @@ func (h *Handler) Subscribe(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, sdk.SubscribeResponse{SubscriptionID: int(subscription.ID)})
+	c.JSON(sdk.NewSuccess(sdk.SubscribeResponse{SubscriptionID: int(subscription.ID)}).AsGinResponse())
 }
 
 // Unsubscribe handles DELETE /outreach/subscriptions.
@@ -123,7 +122,7 @@ func (h *Handler) Unsubscribe(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(sdk.NewSuccessMessage("successfully unsubscribed").AsGinResponse())
 }
 
 // Helper method to authorize an admin request from a given api key

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -133,7 +134,7 @@ func NewOutreachManager(cfg OutreachManagerConfig) (*OutreachManager, error) {
 	}))
 
 	engine.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, sdk.NewErrorResponse(http.StatusNotFound, "NOT_FOUND", "route not found"))
+		c.JSON(sdk.NewErrorResponse(http.StatusNotFound, "NOT_FOUND", "route not found").AsGinResponse())
 	})
 
 	m.engine = engine
@@ -190,6 +191,9 @@ func (m *OutreachManager) register() error {
 	})
 	if err != nil {
 		return fmt.Errorf("RegisterClient: %w", err)
+	}
+	if resp.ClientID == 0 || resp.APIKey == "" {
+		return errors.New("Client id or api key not provided")
 	}
 
 	m.clientKey = resp.APIKey

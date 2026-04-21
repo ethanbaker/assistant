@@ -54,6 +54,8 @@ services:
     build:
       context: .
       dockerfile: api.dockerfile # env file copied in dockerfile
+    ports:
+      - 8080:8080
     volumes:
       - ./resources/config:/app/resources/config
     depends_on:
